@@ -1,2 +1,0 @@
-# LaswI-AI
-LaswI AI
