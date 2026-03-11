@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>LaswI AI · 腾讯混元</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08), 0 6px 12px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        header {
+            padding: 20px 24px;
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #0066ff, #5f9eff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .badge {
+            background: #e9ecef;
+            color: #495057;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 30px;
+            font-weight: 500;
+        }
+        #chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            background: #fafbfc;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .message {
+            display: flex;
+            max-width: 85%;
+        }
+        .user-message {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .assistant-message {
+            align-self: flex-start;
+        }
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+        .user-message .avatar {
+            background: #0066ff;
+            color: white;
+            margin-left: 10px;
+        }
+        .assistant-message .avatar {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            color: #212529;
+            margin-right: 10px;
+        }
+        .bubble {
+            padding: 14px 18px;
+            border-radius: 22px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            word-break: break-word;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        .user-message .bubble {
+            background: #0066ff;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        .assistant-message .bubble {
+            background: white;
+            color: #1e293b;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 5px;
+        }
+        .input-area {
+            padding: 20px 24px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        #user-input {
+            flex: 1;
+            border: 1px solid #dee2e6;
+            border-radius: 30px;
+            padding: 14px 20px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #user-input:focus {
+            border-color: #0066ff;
+            box-shadow: 0 0 0 3px rgba(0,102,255,0.1);
+        }
+        #send-btn {
+            background: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        #send-btn:hover {
+            background: #0052cc;
+        }
+        #send-btn:active {
+            transform: scale(0.96);
+        }
+        #send-btn:disabled {
+            background: #a0c4ff;
+            cursor: not-allowed;
+        }
+        .loading-dots {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .loading-dots span {
+            width: 6px;
+            height: 6px;
+            background: #868e96;
+            border-radius: 50%;
+            animation: pulse 1.4s infinite;
+        }
+        .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes pulse {
+            0%,60%,100% { opacity: 0.3; transform: scale(1); }
+            30% { opacity: 1; transform: scale(1.2); }
+        }
+        .error-message {
+            color: #dc3545;
+            font-size: 0.9rem;
+            text-align: center;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <header>
+            <h1>LaswI AI</h1>
+            <span class="badge">腾讯混元 · 驱动</span>
+        </header>
+        <div id="chat-box"></div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="输入你的问题..." autofocus>
+            <button id="send-btn">发送</button>
+        </div>
+    </div>
+    <script>
+        // DOM 元素
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // 对话历史 (包含一条系统消息，不显示)
+        let messages = [
+            { role: 'system', content: '你叫LaswI，是一个由腾讯混元大模型驱动的智能助手。请用友好、温暖、专业的中文回答用户问题。' }
+        ];
+
+        // 渲染所有消息到界面
+        function renderMessages() {
+            chatBox.innerHTML = '';
+            // 过滤掉系统消息，只显示 user 和 assistant
+            const displayMessages = messages.filter(m => m.role !== 'system');
+            displayMessages.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`;
+
+                const avatar = document.createElement('div');
+                avatar.className = 'avatar';
+                avatar.textContent = msg.role === 'user' ? '我' : 'AI';
+
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                bubble.textContent = msg.content;
+
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(bubble);
+                chatBox.appendChild(messageDiv);
+            });
+            // 滚动到底部
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 显示加载占位 (助手的“正在输入”)
+        function showLoadingIndicator() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant-message';
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.innerHTML = `
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <div class="loading-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            chatBox.appendChild(loadingDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 移除加载占位
+        function removeLoadingIndicator() {
+            const loading = document.getElementById('loading-indicator');
+            if (loading) loading.remove();
+        }
+
+        // 发送消息到后端
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // 禁用输入和按钮
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+
+            // 将用户消息加入历史并渲染
+            messages.push({ role: 'user', content: text });
+            renderMessages();
+            userInput.value = '';
+
+            // 显示“正在输入”动画
+            showLoadingIndicator();
+
+            try {
+                // 调用后端API (注意：后端地址同域，无需写全)
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: messages })  // 发送全部历史（含system）
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || '请求失败');
+                }
+
+                const data = await response.json();
+                const reply = data.reply;
+
+                // 移除加载，加入助手回复
+                removeLoadingIndicator();
+                messages.push({ role: 'assistant', content: reply });
+                renderMessages();
+            } catch (error) {
+                console.error('聊天错误:', error);
+                removeLoadingIndicator();
+
+                // 显示错误消息到界面
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message assistant-message';
+                errorDiv.innerHTML = `
+                    <div class="avatar">AI</div>
+                    <div class="bubble" style="color:#dc3545;">
+                        😵 出错了：${error.message || '请稍后重试'}
+                    </div>
+                `;
+                chatBox.appendChild(errorDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } finally {
+                // 恢复输入和按钮
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        // 事件绑定
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 初始化：可选一条欢迎消息（从assistant发来）
+        window.addEventListener('load', () => {
+            // 可以加一句初始问候 (不存入历史，仅显示)
+            const welcomeDiv = document.createElement('div');
+            welcomeDiv.className = 'message assistant-message';
+            welcomeDiv.innerHTML = `
+                <div class="avatar">AI</div>
+                <div class="bubble">你好！我是 LaswI，你的智能助手。有什么可以帮你的吗？</div>
+            `;
+            chatBox.appendChild(welcomeDiv);
+            // 但为了历史连贯，也可以把这条作为assistant消息加入messages
+            // 这里选择不加，保持简洁。如果需要上下文记住，可以取消下一行注释：
+            // messages.push({ role: 'assistant', content: '你好！我是 LaswI，你的智能助手。有什么可以帮你的吗？' });
+        });
+    </script>
+</body>
+</html>
