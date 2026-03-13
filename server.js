@@ -5,7 +5,7 @@ const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET; //
+const JWT_SECRET = process.env.JWT_SECRET;
 const { Pool } = require('pg');
 
 // 腾讯混元SDK
