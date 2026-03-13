@@ -29,6 +29,34 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// ---------- 自动建表 ----------
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✅ 表 users 已就绪');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(10) NOT NULL,
+        content TEXT NOT NULL,
+        timestamp TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✅ 表 conversations 已就绪');
+  } catch (err) {
+    console.error('❌ 自动建表失败:', err);
+  }
+})();
+
 // JWT 密钥（唯一声明）
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
