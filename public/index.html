@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>LaswI AI · 腾讯混元</title>
+    <title>LaswI AI · 智能助手</title>
     <style>
+        /* 全局极简样式 */
         * {
             margin: 0;
             padding: 0;
@@ -18,6 +19,79 @@
             justify-content: center;
             align-items: center;
         }
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background: white;
+            padding: 40px 32px;
+            border-radius: 24px;
+            width: 340px;
+            max-width: 90%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .modal-content h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #000;
+        }
+        .modal-content input {
+            width: 100%;
+            padding: 14px 16px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .modal-content input:focus {
+            border-color: #0066ff;
+        }
+        .modal-content button {
+            margin: 8px 4px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary {
+            background: #000;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #333;
+        }
+        .btn-secondary {
+            background: #fff;
+            color: #000;
+            border: 1px solid #ddd;
+        }
+        .btn-secondary:hover {
+            background: #f5f5f5;
+        }
+        #authError {
+            color: #dc3545;
+            margin-top: 12px;
+            font-size: 0.9rem;
+        }
+
+        /* 聊天容器 */
         .chat-container {
             width: 100%;
             max-width: 800px;
@@ -28,6 +102,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
         header {
             padding: 20px 24px;
@@ -35,9 +110,14 @@
             border-bottom: 1px solid #e9ecef;
             display: flex;
             align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
             gap: 12px;
         }
-        header h1 {
+        .header-left h1 {
             font-size: 1.5rem;
             font-weight: 600;
             background: linear-gradient(135deg, #0066ff, #5f9eff);
@@ -52,6 +132,41 @@
             padding: 4px 8px;
             border-radius: 30px;
             font-weight: 500;
+        }
+        #user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        #username-display {
+            font-weight: 500;
+            color: #333;
+        }
+        #auth-btn {
+            background: transparent;
+            border: 1px solid #ddd;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #auth-btn:hover {
+            background: #f5f5f5;
+            border-color: #aaa;
+        }
+        #logoutBtn {
+            background: transparent;
+            border: 1px solid #ddd;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #logoutBtn:hover {
+            background: #f5f5f5;
+            border-color: #aaa;
         }
         #chat-box {
             flex: 1;
@@ -183,10 +298,33 @@
     </style>
 </head>
 <body>
-    <div class="chat-container">
+    <!-- 登录/注册模态框 -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <h2>LaswI AI</h2>
+            <input type="text" id="authUsername" placeholder="用户名" autocomplete="username">
+            <input type="password" id="authPassword" placeholder="密码" autocomplete="current-password">
+            <div style="margin-top: 20px;">
+                <button class="btn-primary" onclick="handleLogin()">登录</button>
+                <button class="btn-secondary" onclick="handleRegister()">注册</button>
+                <button class="btn-secondary" onclick="closeAuthModal()" style="margin-top:8px;">取消</button>
+            </div>
+            <p id="authError"></p>
+        </div>
+    </div>
+
+    <!-- 聊天主界面 -->
+    <div id="chatContainer" class="chat-container">
         <header>
-            <h1>LaswI AI</h1>
-            <span class="badge">腾讯混元 · 驱动</span>
+            <div class="header-left">
+                <h1>LaswI AI</h1>
+                <span class="badge">腾讯混元 · 驱动</span>
+            </div>
+            <div id="user-info">
+                <span id="username-display"></span>
+                <button id="auth-btn" onclick="showAuthModal()">登录 / 注册</button>
+                <button id="logoutBtn" onclick="logout()" style="display: none;">退出</button>
+            </div>
         </header>
         <div id="chat-box"></div>
         <div class="input-area">
@@ -194,21 +332,170 @@
             <button id="send-btn">发送</button>
         </div>
     </div>
+
     <script>
+        // ---------- 全局变量 ----------
+        let token = localStorage.getItem('token');
+        let currentUser = null; // { id, username }
+        let messages = [{ role: 'system', content: '你叫LaswI，是一个由腾讯混元大模型驱动的智能助手。请用友好、温暖、专业的中文回答用户问题。' }];
+
         // DOM 元素
+        const authModal = document.getElementById('authModal');
+        const chatContainer = document.getElementById('chatContainer');
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const authError = document.getElementById('authError');
+        const authBtn = document.getElementById('auth-btn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const usernameDisplay = document.getElementById('usernameDisplay');
 
-        // 对话历史 (包含一条系统消息，不显示)
-        let messages = [
-            { role: 'system', content: '你叫LaswI，是一个由腾讯混元大模型驱动的智能助手。请用友好、温暖、专业的中文回答用户问题。' }
-        ];
+        // ---------- 初始化：解析token并加载用户信息 ----------
+        if (token) {
+            // 解析token获取用户信息（不向后端请求）
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                currentUser = { id: payload.userId, username: payload.username };
+                updateUIForUser();
+                fetchHistory(); // 加载历史记录
+            } catch (e) {
+                // token无效，清除
+                localStorage.removeItem('token');
+                token = null;
+                updateUIForGuest();
+            }
+        } else {
+            updateUIForGuest();
+        }
 
-        // 渲染所有消息到界面
+        // ---------- 更新UI根据登录状态 ----------
+        function updateUIForUser() {
+            authBtn.style.display = 'none';
+            logoutBtn.style.display = 'inline-block';
+            usernameDisplay.textContent = currentUser.username;
+        }
+        function updateUIForGuest() {
+            authBtn.style.display = 'inline-block';
+            logoutBtn.style.display = 'none';
+            usernameDisplay.textContent = '';
+        }
+
+        // ---------- 模态框控制 ----------
+        function showAuthModal() {
+            authModal.style.display = 'flex';
+        }
+        function closeAuthModal() {
+            authModal.style.display = 'none';
+            authError.innerText = '';
+            document.getElementById('authUsername').value = '';
+            document.getElementById('authPassword').value = '';
+        }
+        window.closeAuthModal = closeAuthModal; // 暴露给onclick
+
+        // ---------- 登录请求 ----------
+        async function handleLogin() {
+            const username = document.getElementById('authUsername').value.trim();
+            const password = document.getElementById('authPassword').value;
+            if (!username || !password) {
+                authError.innerText = '用户名和密码不能为空';
+                return;
+            }
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    currentUser = data.user;
+                    closeAuthModal();
+                    updateUIForUser();
+                    // 清空当前对话（游客的对话不保留）
+                    messages = [{ role: 'system', content: messages[0].content }];
+                    renderMessages();
+                    await fetchHistory(); // 加载历史记录
+                } else {
+                    authError.innerText = data.error || '登录失败';
+                }
+            } catch (err) {
+                authError.innerText = '网络错误，请重试';
+                console.error(err);
+            }
+        }
+
+        // ---------- 注册请求 ----------
+        async function handleRegister() {
+            const username = document.getElementById('authUsername').value.trim();
+            const password = document.getElementById('authPassword').value;
+            if (!username || !password) {
+                authError.innerText = '用户名和密码不能为空';
+                return;
+            }
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    currentUser = data.user;
+                    closeAuthModal();
+                    updateUIForUser();
+                    // 新用户无历史，清空游客对话
+                    messages = [{ role: 'system', content: messages[0].content }];
+                    renderMessages();
+                } else {
+                    authError.innerText = data.error || '注册失败';
+                }
+            } catch (err) {
+                authError.innerText = '网络错误，请重试';
+                console.error(err);
+            }
+        }
+
+        // ---------- 退出登录 ----------
+        function logout() {
+            localStorage.removeItem('token');
+            token = null;
+            currentUser = null;
+            updateUIForGuest();
+            // 清空聊天记录（游客模式重新开始）
+            messages = [{ role: 'system', content: messages[0].content }];
+            renderMessages();
+        }
+
+        // ---------- 加载历史记录 ----------
+        async function fetchHistory() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        // token无效
+                        logout();
+                    }
+                    return;
+                }
+                const history = await res.json(); // 数组 { role, content }
+                // 重建messages：系统消息 + 历史
+                messages = [{ role: 'system', content: messages[0].content }, ...history];
+                renderMessages();
+            } catch (err) {
+                console.error('加载历史失败', err);
+            }
+        }
+
+        // ---------- 渲染消息 ----------
         function renderMessages() {
             chatBox.innerHTML = '';
-            // 过滤掉系统消息，只显示 user 和 assistant
             const displayMessages = messages.filter(m => m.role !== 'system');
             displayMessages.forEach(msg => {
                 const messageDiv = document.createElement('div');
@@ -226,11 +513,10 @@
                 messageDiv.appendChild(bubble);
                 chatBox.appendChild(messageDiv);
             });
-            // 滚动到底部
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 显示加载占位 (助手的“正在输入”)
+        // ---------- 显示/移除加载指示器 ----------
         function showLoadingIndicator() {
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'message assistant-message';
@@ -247,35 +533,40 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 移除加载占位
         function removeLoadingIndicator() {
             const loading = document.getElementById('loading-indicator');
             if (loading) loading.remove();
         }
 
-        // 发送消息到后端
+        // ---------- 发送消息 ----------
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
-            // 禁用输入和按钮
+            // 禁用输入
             userInput.disabled = true;
             sendBtn.disabled = true;
 
-            // 将用户消息加入历史并渲染
+            // 将用户消息加入messages并渲染
             messages.push({ role: 'user', content: text });
             renderMessages();
             userInput.value = '';
 
-            // 显示“正在输入”动画
+            // 显示“正在输入”
             showLoadingIndicator();
 
             try {
-                // 调用后端API (注意：后端地址同域，无需写全)
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: messages })  // 发送全部历史（含system）
+                    headers: headers,
+                    body: JSON.stringify({ messages: messages }) // 发送整个历史
                 });
 
                 if (!response.ok) {
@@ -286,7 +577,6 @@
                 const data = await response.json();
                 const reply = data.reply;
 
-                // 移除加载，加入助手回复
                 removeLoadingIndicator();
                 messages.push({ role: 'assistant', content: reply });
                 renderMessages();
@@ -294,7 +584,6 @@
                 console.error('聊天错误:', error);
                 removeLoadingIndicator();
 
-                // 显示错误消息到界面
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message assistant-message';
                 errorDiv.innerHTML = `
@@ -306,14 +595,13 @@
                 chatBox.appendChild(errorDiv);
                 chatBox.scrollTop = chatBox.scrollHeight;
             } finally {
-                // 恢复输入和按钮
                 userInput.disabled = false;
                 sendBtn.disabled = false;
                 userInput.focus();
             }
         }
 
-        // 事件绑定
+        // ---------- 事件绑定 ----------
         sendBtn.addEventListener('click', sendMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -322,20 +610,19 @@
             }
         });
 
-        // 初始化：可选一条欢迎消息（从assistant发来）
-        window.addEventListener('load', () => {
-            // 可以加一句初始问候 (不存入历史，仅显示)
-            const welcomeDiv = document.createElement('div');
-            welcomeDiv.className = 'message assistant-message';
-            welcomeDiv.innerHTML = `
-                <div class="avatar">AI</div>
-                <div class="bubble">你好！我是 LaswI，你的智能助手。有什么可以帮你的吗？</div>
-            `;
-            chatBox.appendChild(welcomeDiv);
-            // 但为了历史连贯，也可以把这条作为assistant消息加入messages
-            // 这里选择不加，保持简洁。如果需要上下文记住，可以取消下一行注释：
-            // messages.push({ role: 'assistant', content: '你好！我是 LaswI，你的智能助手。有什么可以帮你的吗？' });
+        // 模态框回车登录
+        document.getElementById('authPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleLogin();
+            }
         });
+
+        // 暴露函数给全局
+        window.handleLogin = handleLogin;
+        window.handleRegister = handleRegister;
+        window.showAuthModal = showAuthModal;
+        window.logout = logout;
     </script>
 </body>
 </html>
