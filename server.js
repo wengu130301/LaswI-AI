@@ -5,7 +5,6 @@ const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET;
 const { Pool } = require('pg');
 
 // 腾讯混元SDK
@@ -30,7 +29,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// JWT 密钥
+// JWT 密钥（唯一声明）
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // 初始化腾讯混元客户端
