@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>我的二维码 - LaswI</title>
+    <style>
+        body { font-family: system-ui; text-align: center; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.8rem; margin-bottom: 20px; }
+        #qrImage { width: 250px; height: 250px; margin: 20px auto; display: block; }
+        #status { margin: 10px 0; color: #666; }
+        #refreshBtn { background: #0066ff; color: white; border: none; border-radius: 30px; padding: 12px 30px; font-size: 1rem; cursor: pointer; }
+        #refreshBtn:hover { background: #0052cc; }
+        .note { color: #999; font-size: 0.9rem; margin-top: 20px; }
+        .error { color: #dc3545; }
+        #timer { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>扫码切换设备</h1>
+        <p>用另一台设备扫描此二维码，当前设备将自动退出</p>
+        <div id="qrContainer">
+            <img id="qrImage" src="" alt="二维码加载中...">
+        </div>
+        <p id="status">二维码有效 <span id="timer">5:00</span></p>
+        <button id="refreshBtn" onclick="refreshQR()">重新生成</button>
+        <p class="note">二维码5分钟内有效，且只能使用一次</p>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            alert('请先登录');
+            window.location.href = '/';
+        }
+
+        let expireTime = null;
+        let timerInterval = null;
+
+        async function loadQR() {
+            try {
+                const res = await fetch('/api/qr/generate', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('qrImage').src = data.qrImage;
+                    expireTime = Date.now() + data.expiresIn * 1000;
+                    startTimer(data.expiresIn);
+                } else {
+                    document.getElementById('status').innerHTML = `<span class="error">${data.error || '加载失败'}</span>`;
+                }
+            } catch (err) {
+                document.getElementById('status').innerHTML = '<span class="error">网络错误</span>';
+            }
+        }
+
+        function startTimer(seconds) {
+            if (timerInterval) clearInterval(timerInterval);
+            const timerEl = document.getElementById('timer');
+            timerInterval = setInterval(() => {
+                const remaining = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                timerEl.textContent = `${mins}:${secs < 10 ? '0' + secs : secs}`;
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('status').innerHTML = '二维码已过期，请重新生成';
+                }
+            }, 1000);
+        }
+
+        async function refreshQR() {
+            document.getElementById('qrImage').src = '';
+            document.getElementById('status').innerHTML = '生成中...';
+            await loadQR();
+        }
+
+        loadQR();
+    </script>
+</body>
+</html>
