@@ -6,7 +6,6 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
-const axios = require('axios');          // 如果不用 PayJs 可以删除，但保留不影响
 const crypto = require('crypto');
 const QRCode = require('qrcode');
 
