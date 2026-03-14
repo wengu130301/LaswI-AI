@@ -5,79 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>LaswI AI · 智能助手</title>
     <style>
-        /* ========== 全局样式变量 ========== */
-        :root {
-            --bg-color: #f0f2f5;
-            --container-bg: white;
-            --header-border: #e9ecef;
-            --text-primary: #1e1e1e;
-            --text-secondary: #666;
-            --text-muted: #999;
-            --border-light: #ddd;
-            --chat-bg: #fafbfc;
-            --bubble-user-bg: #0066ff;
-            --bubble-assistant-bg: white;
-            --bubble-assistant-border: #e9ecef;
-            --avatar-assistant-bg: white;
-            --avatar-assistant-border: #dee2e6;
-            --input-border: #dee2e6;
-            --input-focus-border: #0066ff;
-            --btn-primary-bg: #0066ff;
-            --btn-primary-hover: #0052cc;
-            --btn-primary-disabled: #a0c4ff;
-            --btn-secondary-bg: transparent;
-            --btn-secondary-border: #ddd;
-            --btn-secondary-hover: #f5f5f5;
-            --icon-opacity: 0.6;
-            --icon-hover-opacity: 1;
-            --modal-overlay: rgba(0,0,0,0.5);
-
-            /* 可调节变量 */
-            --font-size-base: 16px;        /* 基础字体大小 */
-            --message-spacing: 18px;        /* 消息间距 */
-            --input-padding: 14px 20px;     /* 输入框内边距 */
-            --send-btn-padding: 14px 28px;   /* 发送按钮内边距 */
-            --header-padding: 20px 24px;     /* 头部内边距 */
-        }
-
-        /* 紧凑模式变量 */
-        [data-compact="true"] {
-            --font-size-base: 14px;
-            --message-spacing: 10px;
-            --input-padding: 10px 16px;
-            --send-btn-padding: 10px 20px;
-            --header-padding: 12px 16px;
-        }
-
-        /* 暗色模式变量 */
-        [data-theme="dark"] {
-            --bg-color: #1a1a1a;
-            --container-bg: #2d2d2d;
-            --header-border: #404040;
-            --text-primary: #e0e0e0;
-            --text-secondary: #b0b0b0;
-            --text-muted: #808080;
-            --border-light: #404040;
-            --chat-bg: #252525;
-            --bubble-user-bg: #0066ff;
-            --bubble-assistant-bg: #3a3a3a;
-            --bubble-assistant-border: #505050;
-            --avatar-assistant-bg: #3a3a3a;
-            --avatar-assistant-border: #606060;
-            --input-border: #404040;
-            --input-focus-border: #0066ff;
-            --btn-primary-bg: #0066ff;
-            --btn-primary-hover: #0052cc;
-            --btn-primary-disabled: #335c8a;
-            --btn-secondary-bg: transparent;
-            --btn-secondary-border: #404040;
-            --btn-secondary-hover: #3a3a3a;
-            --icon-opacity: 0.7;
-            --icon-hover-opacity: 1;
-            --modal-overlay: rgba(0,0,0,0.7);
-        }
-
-        /* ========== 基础样式 ========== */
+        /* ========== 完整样式 ========== */
         * {
             margin: 0;
             padding: 0;
@@ -85,16 +13,12 @@
             font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
         }
         body {
-            background: var(--bg-color);
+            background: #f0f2f5;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: background 0.2s;
-            font-size: var(--font-size-base);
         }
-
-        /* 模态框通用 */
         .modal {
             display: none;
             position: fixed;
@@ -102,163 +26,136 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: var(--modal-overlay);
+            background: rgba(0,0,0,0.5);
             align-items: center;
             justify-content: center;
             z-index: 2000;
-            padding: 16px;
         }
         .modal-content {
-            background: var(--container-bg);
-            color: var(--text-primary);
-            padding: 32px 24px;
+            background: white;
+            padding: 40px 32px;
             border-radius: 24px;
-            width: 100%;
-            max-width: 400px;
+            width: 340px;
+            max-width: 90%;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            transition: background 0.2s, color 0.2s;
+            text-align: center;
         }
         .modal-content h2 {
             font-size: 1.8rem;
             font-weight: 600;
             margin-bottom: 24px;
-            color: var(--text-primary);
+            color: #000;
         }
-        .modal-content input, .modal-content select {
+        .modal-content input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 14px 16px;
             margin: 8px 0;
-            border: 1px solid var(--border-light);
+            border: 1px solid #ddd;
             border-radius: 30px;
             font-size: 1rem;
             outline: none;
-            background: var(--container-bg);
-            color: var(--text-primary);
-            transition: border 0.2s, background 0.2s;
+            transition: border-color 0.2s;
         }
         .modal-content input:focus {
-            border-color: var(--input-focus-border);
+            border-color: #0066ff;
         }
         .modal-content button {
             margin: 8px 4px;
-            padding: 12px 20px;
+            padding: 12px 24px;
             border: none;
             border-radius: 30px;
             font-size: 1rem;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s, border 0.2s;
+            transition: background 0.2s;
         }
         .btn-primary {
-            background: var(--btn-primary-bg);
+            background: #000;
             color: white;
         }
         .btn-primary:hover {
-            background: var(--btn-primary-hover);
+            background: #333;
         }
         .btn-secondary {
-            background: var(--btn-secondary-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--btn-secondary-border);
+            background: #fff;
+            color: #000;
+            border: 1px solid #ddd;
         }
         .btn-secondary:hover {
-            background: var(--btn-secondary-hover);
+            background: #f5f5f5;
         }
-        .close-btn {
-            float: right;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-muted);
+        #authError {
+            color: #dc3545;
+            margin-top: 12px;
+            font-size: 0.9rem;
         }
-        .close-btn:hover {
-            color: var(--text-primary);
-        }
-
-        /* 聊天容器 */
         .chat-container {
             width: 100%;
             max-width: 800px;
             height: 90vh;
-            background: var(--container-bg);
+            background: white;
             border-radius: 28px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.08), 0 6px 12px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: background 0.2s;
+            position: relative;
         }
         header {
-            padding: var(--header-padding);
-            background: var(--container-bg);
-            border-bottom: 1px solid var(--header-border);
+            padding: 20px 24px;
+            background: white;
+            border-bottom: 1px solid #e9ecef;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            transition: background 0.2s, border 0.2s, padding 0.2s;
-            flex-wrap: wrap;
-            gap: 8px;
         }
         .header-left {
             display: flex;
             align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
+            gap: 12px;
         }
         .header-left h1 {
-            font-size: 1.4rem;
+            font-size: 1.5rem;
             font-weight: 600;
             background: linear-gradient(135deg, #0066ff, #5f9eff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            white-space: nowrap;
         }
         .badge {
-            background: var(--border-light);
-            color: var(--text-secondary);
+            background: #e9ecef;
+            color: #495057;
             font-size: 0.7rem;
             padding: 4px 8px;
             border-radius: 30px;
             font-weight: 500;
-            transition: background 0.2s, color 0.2s;
-            white-space: nowrap;
         }
         #user-info {
             display: flex;
             align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
+            gap: 12px;
         }
         #username-display {
             font-weight: 500;
-            color: var(--text-primary);
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            color: #333;
         }
         .icon-btn {
             background: transparent;
-            border: 1px solid var(--border-light);
+            border: 1px solid #ddd;
             border-radius: 30px;
             padding: 6px 12px;
-            font-size: 1rem;
+            font-size: 0.9rem;
             cursor: pointer;
-            color: var(--text-primary);
+            color: #333;
             transition: all 0.2s;
+            text-decoration: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 36px;
         }
         .icon-btn:hover {
-            background: var(--btn-secondary-hover);
-            border-color: var(--text-secondary);
-        }
-        .icon-btn.on {
-            background: var(--btn-primary-bg);
-            color: white;
-            border-color: var(--btn-primary-bg);
+            background: #f5f5f5;
+            border-color: #aaa;
         }
         #auto-speak-toggle {
             font-size: 1rem;
@@ -266,24 +163,18 @@
         #theme-toggle {
             font-size: 1rem;
         }
-        #settings-btn {
-            font-size: 1.2rem;
-            padding: 6px 10px;
-        }
-
         #chat-box {
             flex: 1;
             overflow-y: auto;
-            padding: var(--message-spacing) 16px;
-            background: var(--chat-bg);
+            padding: 24px;
+            background: #fafbfc;
             display: flex;
             flex-direction: column;
-            gap: var(--message-spacing);
-            transition: background 0.2s, padding 0.2s, gap 0.2s;
+            gap: 18px;
         }
         .message {
             display: flex;
-            max-width: 90%;
+            max-width: 85%;
         }
         .user-message {
             align-self: flex-end;
@@ -302,100 +193,88 @@
             font-size: 0.9rem;
             font-weight: 500;
             flex-shrink: 0;
-            transition: background 0.2s, border 0.2s, color 0.2s;
         }
         .user-message .avatar {
-            background: var(--bubble-user-bg);
+            background: #0066ff;
             color: white;
-            margin-left: 8px;
+            margin-left: 10px;
         }
         .assistant-message .avatar {
-            background: var(--avatar-assistant-bg);
-            border: 1px solid var(--avatar-assistant-border);
-            color: var(--text-primary);
-            margin-right: 8px;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            color: #212529;
+            margin-right: 10px;
         }
         .bubble {
-            padding: 12px 16px;
+            padding: 14px 18px;
             border-radius: 22px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             line-height: 1.5;
             word-break: break-word;
             box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-            transition: background 0.2s, color 0.2s, border 0.2s;
         }
         .user-message .bubble {
-            background: var(--bubble-user-bg);
+            background: #0066ff;
             color: white;
             border-bottom-right-radius: 5px;
         }
         .assistant-message .bubble {
-            background: var(--bubble-assistant-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--bubble-assistant-border);
+            background: white;
+            color: #1e293b;
+            border: 1px solid #e9ecef;
             border-bottom-left-radius: 5px;
         }
         .speaker-icon {
             display: inline-block;
-            margin-left: 6px;
+            margin-left: 8px;
             cursor: pointer;
             font-size: 1.1rem;
-            opacity: var(--icon-opacity);
-            transition: opacity 0.2s, color 0.2s;
+            opacity: 0.6;
+            transition: opacity 0.2s;
             align-self: center;
-            color: var(--text-secondary);
         }
         .speaker-icon:hover {
-            opacity: var(--icon-hover-opacity);
-            color: var(--btn-primary-bg);
+            opacity: 1;
         }
         .speaker-icon.speaking {
             opacity: 1;
-            color: var(--btn-primary-bg);
+            color: #0066ff;
         }
         .input-area {
-            padding: 12px 16px;
-            background: var(--container-bg);
-            border-top: 1px solid var(--header-border);
+            padding: 20px 24px;
+            background: white;
+            border-top: 1px solid #e9ecef;
             display: flex;
-            gap: 8px;
+            gap: 12px;
             align-items: center;
-            transition: background 0.2s, border 0.2s;
-            flex-wrap: wrap;
         }
         #user-input {
             flex: 1;
-            min-width: 150px;
-            border: 1px solid var(--input-border);
+            border: 1px solid #dee2e6;
             border-radius: 30px;
-            padding: var(--input-padding);
+            padding: 14px 20px;
             font-size: 1rem;
             outline: none;
-            background: var(--container-bg);
-            color: var(--text-primary);
-            transition: border 0.2s, background 0.2s, color 0.2s, padding 0.2s;
+            transition: border-color 0.2s;
         }
         #user-input:focus {
-            border-color: var(--input-focus-border);
+            border-color: #0066ff;
+            box-shadow: 0 0 0 3px rgba(0,102,255,0.1);
         }
         #voice-btn {
             background: transparent;
-            border: 1px solid var(--border-light);
+            border: 1px solid #ddd;
             border-radius: 30px;
             width: 46px;
             height: 46px;
             font-size: 1.2rem;
             cursor: pointer;
-            color: var(--text-primary);
+            color: #333;
             transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
         }
         #voice-btn:hover {
-            background: var(--btn-secondary-hover);
-            border-color: var(--text-secondary);
+            background: #f5f5f5;
+            border-color: #aaa;
         }
         #voice-btn.listening {
             background: #ff4444;
@@ -409,25 +288,24 @@
             100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
         #send-btn {
-            background: var(--btn-primary-bg);
+            background: #0066ff;
             color: white;
             border: none;
             border-radius: 30px;
-            padding: var(--send-btn-padding);
+            padding: 14px 28px;
             font-size: 1rem;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s, padding 0.2s;
-            flex-shrink: 0;
+            transition: background 0.2s, transform 0.1s;
         }
         #send-btn:hover {
-            background: var(--btn-primary-hover);
+            background: #0052cc;
         }
         #send-btn:active {
             transform: scale(0.96);
         }
         #send-btn:disabled {
-            background: var(--btn-primary-disabled);
+            background: #a0c4ff;
             cursor: not-allowed;
         }
         .loading-dots {
@@ -438,7 +316,7 @@
         .loading-dots span {
             width: 6px;
             height: 6px;
-            background: var(--text-secondary);
+            background: #868e96;
             border-radius: 50%;
             animation: pulse 1.4s infinite;
         }
@@ -454,108 +332,21 @@
             text-align: center;
             margin: 10px 0;
         }
-
-        /* 设置面板专用样式 */
-        .setting-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 16px 0;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border-light);
-        }
-        .setting-item label {
-            font-weight: 500;
-        }
-        .setting-item input[type="range"] {
-            width: 150px;
-            margin: 0 8px;
-        }
-        .setting-item select {
-            padding: 4px 8px;
-            border-radius: 20px;
-            border: 1px solid var(--border-light);
-            background: var(--container-bg);
-            color: var(--text-primary);
-        }
-        .setting-item .value-display {
-            min-width: 40px;
-            text-align: center;
-        }
-
-        /* 移动端调整 */
-        @media (max-width: 600px) {
-            .header-left h1 {
-                font-size: 1.2rem;
-            }
-            .badge {
-                display: none;
-            }
-            #username-display {
-                max-width: 80px;
-            }
-            .icon-btn {
-                padding: 6px 8px;
-                font-size: 0.9rem;
-            }
-            #voice-btn {
-                width: 40px;
-                height: 40px;
-                font-size: 1rem;
-            }
-            #send-btn {
-                padding: 10px 16px;
-            }
-            .message {
-                max-width: 95%;
-            }
-        }
     </style>
 </head>
 <body>
     <!-- 登录模态框 -->
     <div id="authModal" class="modal">
         <div class="modal-content">
-            <span class="close-btn" onclick="closeAuthModal()">&times;</span>
             <h2>LaswI AI</h2>
             <input type="text" id="authUsername" placeholder="用户名" autocomplete="username">
             <input type="password" id="authPassword" placeholder="密码" autocomplete="current-password">
             <div style="margin-top: 20px;">
                 <button class="btn-primary" onclick="handleLogin()">登录</button>
                 <button class="btn-secondary" onclick="handleRegister()">注册</button>
+                <button class="btn-secondary" onclick="closeAuthModal()">取消</button>
             </div>
             <p id="authError"></p>
-        </div>
-    </div>
-
-    <!-- 设置模态框 -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeSettingsModal()">&times;</span>
-            <h2>设置</h2>
-            
-            <div class="setting-item">
-                <label>暗色模式</label>
-                <button id="settingsThemeToggle" class="btn-secondary" onclick="toggleTheme()" style="padding: 6px 16px;">🌙 切换</button>
-            </div>
-            
-            <div class="setting-item">
-                <label>字体大小</label>
-                <input type="range" id="fontSizeRange" min="12" max="20" value="16" step="1" oninput="updateFontSize(this.value)">
-                <span id="fontSizeDisplay" class="value-display">16px</span>
-            </div>
-            
-            <div class="setting-item">
-                <label>紧凑模式</label>
-                <button id="compactToggle" class="btn-secondary" onclick="toggleCompact()" style="padding: 6px 16px;">关闭</button>
-            </div>
-            
-            <div class="setting-item">
-                <label>自动朗读</label>
-                <button id="autoSpeakToggleSettings" class="btn-secondary" onclick="toggleAutoSpeak()" style="padding: 6px 16px;">🔇 关闭</button>
-            </div>
-            
-            <button class="btn-primary" onclick="closeSettingsModal()" style="width:100%; margin-top:20px;">完成</button>
         </div>
     </div>
 
@@ -568,11 +359,8 @@
             </div>
             <div id="user-info">
                 <span id="username-display"></span>
-                <!-- 设置按钮 -->
-                <button id="settings-btn" class="icon-btn" onclick="showSettingsModal()" title="设置">⚙️</button>
-                <!-- 主题切换快捷按钮 -->
-                <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()" title="切换主题">🌙</button>
-                <!-- 自动朗读快捷按钮 -->
+                <!-- 二维码入口 -->
+                <a href="/my-qr.html" class="icon-btn" style="margin-right: 8px;">🔲 二维码</a>
                 <button id="auto-speak-toggle" class="icon-btn" onclick="toggleAutoSpeak()" title="自动朗读">🔇</button>
                 <button id="auth-btn" class="icon-btn" onclick="showAuthModal()">登录/注册</button>
                 <button id="logoutBtn" class="icon-btn" onclick="logout()" style="display: none;">退出</button>
@@ -591,17 +379,12 @@
         let token = localStorage.getItem('token');
         let currentUser = null;
         let messages = [{ role: 'system', content: '你叫LaswI，是一个由腾讯混元大模型驱动的智能助手。请用友好、温暖、专业的中文回答用户问题。' }];
-        let isAutoSpeakOn = localStorage.getItem('autoSpeak') === 'true' || false;
+        let isAutoSpeakOn = false;
         let isListening = false;
         let recognition = null;
-        let theme = localStorage.getItem('theme') || 'light';
-        let compact = localStorage.getItem('compact') === 'true' || false;
-        let fontSize = parseInt(localStorage.getItem('fontSize')) || 16;
 
         // DOM 元素
         const authModal = document.getElementById('authModal');
-        const settingsModal = document.getElementById('settingsModal');
-        const chatContainer = document.getElementById('chatContainer');
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
@@ -611,35 +394,28 @@
         const usernameDisplay = document.getElementById('username-display');
         const autoSpeakToggle = document.getElementById('auto-speak-toggle');
         const voiceBtn = document.getElementById('voice-btn');
-        const themeToggle = document.getElementById('theme-toggle');
-        const settingsThemeToggle = document.getElementById('settingsThemeToggle');
-        const fontSizeRange = document.getElementById('fontSizeRange');
-        const fontSizeDisplay = document.getElementById('fontSizeDisplay');
-        const compactToggle = document.getElementById('compactToggle');
-        const autoSpeakToggleSettings = document.getElementById('autoSpeakToggleSettings');
 
-        // ---------- 初始化 ----------
-        // 应用主题
-        document.documentElement.setAttribute('data-theme', theme);
-        updateThemeButtons();
-        // 应用紧凑模式
-        document.documentElement.setAttribute('data-compact', compact);
-        updateCompactButton();
-        // 应用字体大小
-        document.documentElement.style.setProperty('--font-size-base', fontSize + 'px');
-        if (fontSizeRange) fontSizeRange.value = fontSize;
-        if (fontSizeDisplay) fontSizeDisplay.textContent = fontSize + 'px';
-        // 自动朗读状态
-        updateAutoSpeakUI();
+        // ---------- 拦截 fetch，处理401 ----------
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            return originalFetch.apply(this, args).then(response => {
+                if (response.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    alert('您的登录已过期，请重新登录');
+                    window.location.href = '/';
+                }
+                return response;
+            });
+        };
 
-        // 语音识别初始化
+        // ---------- 语音识别初始化 ----------
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.lang = 'zh-CN';
             recognition.continuous = false;
             recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
 
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript;
@@ -673,7 +449,6 @@
             }
         }
 
-        // 切换语音输入
         window.toggleVoiceInput = () => {
             if (!recognition) {
                 alert('您的浏览器不支持语音识别');
@@ -693,103 +468,31 @@
             }
         };
 
-        // 更新主题按钮显示
-        function updateThemeButtons() {
-            const icon = theme === 'dark' ? '☀️' : '🌙';
-            if (themeToggle) themeToggle.textContent = icon;
-            if (settingsThemeToggle) settingsThemeToggle.textContent = icon + ' 切换';
-        }
-
-        // 切换主题
-        window.toggleTheme = () => {
-            theme = theme === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('theme', theme);
-            updateThemeButtons();
-        };
-
-        // 更新紧凑按钮显示
-        function updateCompactButton() {
-            if (compactToggle) compactToggle.textContent = compact ? '开启' : '关闭';
-        }
-
-        // 切换紧凑模式
-        window.toggleCompact = () => {
-            compact = !compact;
-            document.documentElement.setAttribute('data-compact', compact);
-            localStorage.setItem('compact', compact);
-            updateCompactButton();
-        };
-
-        // 更新字体大小
-        window.updateFontSize = (value) => {
-            fontSize = parseInt(value);
-            document.documentElement.style.setProperty('--font-size-base', fontSize + 'px');
-            localStorage.setItem('fontSize', fontSize);
-            if (fontSizeDisplay) fontSizeDisplay.textContent = fontSize + 'px';
-        };
-
-        // 更新自动朗读UI
-        function updateAutoSpeakUI() {
-            const icon = isAutoSpeakOn ? '🔊' : '🔇';
-            if (autoSpeakToggle) {
-                autoSpeakToggle.textContent = icon;
-                autoSpeakToggle.classList.toggle('on', isAutoSpeakOn);
-            }
-            if (autoSpeakToggleSettings) {
-                autoSpeakToggleSettings.textContent = isAutoSpeakOn ? '🔊 开启' : '🔇 关闭';
-            }
-        }
-
-        // 切换自动朗读
-        window.toggleAutoSpeak = () => {
-            isAutoSpeakOn = !isAutoSpeakOn;
-            localStorage.setItem('autoSpeak', isAutoSpeakOn);
-            updateAutoSpeakUI();
-        };
-
-        // 显示设置模态框
-        window.showSettingsModal = () => {
-            settingsModal.style.display = 'flex';
-            // 同步当前值到设置面板
-            fontSizeRange.value = fontSize;
-            fontSizeDisplay.textContent = fontSize + 'px';
-            updateCompactButton();
-            updateAutoSpeakUI();
-        };
-        window.closeSettingsModal = () => {
-            settingsModal.style.display = 'none';
-        };
-
-        // 登录/注册相关函数
+        // ---------- 用户界面更新 ----------
         function updateUIForUser() {
-            if (authBtn) authBtn.style.display = 'none';
-            if (logoutBtn) logoutBtn.style.display = 'inline-block';
-            if (usernameDisplay) usernameDisplay.textContent = currentUser.username;
+            authBtn.style.display = 'none';
+            logoutBtn.style.display = 'inline-block';
+            usernameDisplay.textContent = currentUser.username;
         }
         function updateUIForGuest() {
-            if (authBtn) authBtn.style.display = 'inline-block';
-            if (logoutBtn) logoutBtn.style.display = 'none';
-            if (usernameDisplay) usernameDisplay.textContent = '';
+            authBtn.style.display = 'inline-block';
+            logoutBtn.style.display = 'none';
+            usernameDisplay.textContent = '';
         }
 
-        window.showAuthModal = () => {
-            authModal.style.display = 'flex';
-        };
+        window.showAuthModal = () => authModal.style.display = 'flex';
         window.closeAuthModal = () => {
             authModal.style.display = 'none';
-            if (authError) authError.innerText = '';
-            const usernameInput = document.getElementById('authUsername');
-            const passwordInput = document.getElementById('authPassword');
-            if (usernameInput) usernameInput.value = '';
-            if (passwordInput) passwordInput.value = '';
+            authError.innerText = '';
+            document.getElementById('authUsername').value = '';
+            document.getElementById('authPassword').value = '';
         };
 
         async function handleLogin() {
-            const username = document.getElementById('authUsername')?.value.trim();
-            const password = document.getElementById('authPassword')?.value;
+            const username = document.getElementById('authUsername').value.trim();
+            const password = document.getElementById('authPassword').value;
             if (!username || !password) {
-                if (authError) authError.innerText = '用户名和密码不能为空';
+                authError.innerText = '用户名和密码不能为空';
                 return;
             }
             try {
@@ -802,6 +505,7 @@
                 if (res.ok) {
                     token = data.token;
                     localStorage.setItem('token', token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
                     currentUser = data.user;
                     closeAuthModal();
                     updateUIForUser();
@@ -809,18 +513,18 @@
                     renderMessages();
                     await fetchHistory();
                 } else {
-                    if (authError) authError.innerText = data.error || '登录失败';
+                    authError.innerText = data.error || '登录失败';
                 }
             } catch (err) {
-                if (authError) authError.innerText = '网络错误，请重试';
+                authError.innerText = '网络错误，请重试';
             }
         }
 
         async function handleRegister() {
-            const username = document.getElementById('authUsername')?.value.trim();
-            const password = document.getElementById('authPassword')?.value;
+            const username = document.getElementById('authUsername').value.trim();
+            const password = document.getElementById('authPassword').value;
             if (!username || !password) {
-                if (authError) authError.innerText = '用户名和密码不能为空';
+                authError.innerText = '用户名和密码不能为空';
                 return;
             }
             try {
@@ -833,16 +537,17 @@
                 if (res.ok) {
                     token = data.token;
                     localStorage.setItem('token', token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
                     currentUser = data.user;
                     closeAuthModal();
                     updateUIForUser();
                     messages = [{ role: 'system', content: messages[0].content }];
                     renderMessages();
                 } else {
-                    if (authError) authError.innerText = data.error || '注册失败';
+                    authError.innerText = data.error || '注册失败';
                 }
             } catch (err) {
-                if (authError) authError.innerText = '网络错误，请重试';
+                authError.innerText = '网络错误，请重试';
             }
         }
 
@@ -851,6 +556,7 @@
 
         window.logout = () => {
             localStorage.removeItem('token');
+            localStorage.removeItem('user');
             token = null;
             currentUser = null;
             updateUIForGuest();
@@ -859,7 +565,12 @@
             stopListening();
         };
 
-        // 朗读功能
+        window.toggleAutoSpeak = () => {
+            isAutoSpeakOn = !isAutoSpeakOn;
+            autoSpeakToggle.textContent = isAutoSpeakOn ? '🔊' : '🔇';
+            autoSpeakToggle.classList.toggle('on', isAutoSpeakOn);
+        };
+
         function speakText(text, speakerElement) {
             if (!window.speechSynthesis) {
                 alert('您的浏览器不支持语音朗读功能');
@@ -883,9 +594,7 @@
             speechSynthesis.speak(utterance);
         }
 
-        // 渲染消息
         function renderMessages() {
-            if (!chatBox) return;
             chatBox.innerHTML = '';
             const displayMessages = messages.filter(m => m.role !== 'system');
             displayMessages.forEach((msg, index) => {
@@ -986,22 +695,18 @@
             }
         }
 
-        // 回车发送
-        if (userInput) {
-            userInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-        }
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
 
-        // 预加载声音
         if (window.speechSynthesis) {
             speechSynthesis.getVoices();
         }
 
-        // 初始化用户界面
+        // 初始化
         if (token) {
             try {
                 const payload = JSON.parse(atob(token.split('.')[1]));
@@ -1010,18 +715,13 @@
                 fetchHistory();
             } catch (e) {
                 localStorage.removeItem('token');
+                localStorage.removeItem('user');
                 token = null;
                 updateUIForGuest();
             }
         } else {
             updateUIForGuest();
         }
-
-        // 点击模态框外部关闭
-        window.onclick = (event) => {
-            if (event.target === authModal) closeAuthModal();
-            if (event.target === settingsModal) closeSettingsModal();
-        };
     </script>
 </body>
 </html>
