@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>LaswI AI · 智能助手</title>
     <style>
-        /* 全局极简样式 */
+        /* ========== 完整样式（含全局开关）========== */
         * {
             margin: 0;
             padding: 0;
@@ -19,7 +19,6 @@
             justify-content: center;
             align-items: center;
         }
-        /* 模态框样式 */
         .modal {
             display: none;
             position: fixed;
@@ -90,8 +89,6 @@
             margin-top: 12px;
             font-size: 0.9rem;
         }
-
-        /* 聊天容器 */
         .chat-container {
             width: 100%;
             max-width: 800px;
@@ -142,7 +139,24 @@
             font-weight: 500;
             color: #333;
         }
-        #auth-btn {
+        #auto-speak-toggle {
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0 8px;
+            line-height: 1;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        #auto-speak-toggle:hover {
+            opacity: 1;
+        }
+        #auto-speak-toggle.on {
+            opacity: 1;
+            color: #0066ff;
+        }
+        #auth-btn, #logoutBtn {
             background: transparent;
             border: 1px solid #ddd;
             padding: 6px 16px;
@@ -151,20 +165,7 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        #auth-btn:hover {
-            background: #f5f5f5;
-            border-color: #aaa;
-        }
-        #logoutBtn {
-            background: transparent;
-            border: 1px solid #ddd;
-            padding: 6px 16px;
-            border-radius: 30px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        #logoutBtn:hover {
+        #auth-btn:hover, #logoutBtn:hover {
             background: #f5f5f5;
             border-color: #aaa;
         }
@@ -228,6 +229,22 @@
             color: #1e293b;
             border: 1px solid #e9ecef;
             border-bottom-left-radius: 5px;
+        }
+        .speaker-icon {
+            display: inline-block;
+            margin-left: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            align-self: center;
+        }
+        .speaker-icon:hover {
+            opacity: 1;
+        }
+        .speaker-icon.speaking {
+            opacity: 1;
+            color: #0066ff;
         }
         .input-area {
             padding: 20px 24px;
@@ -298,7 +315,7 @@
     </style>
 </head>
 <body>
-    <!-- 登录/注册模态框 -->
+    <!-- 登录模态框 -->
     <div id="authModal" class="modal">
         <div class="modal-content">
             <h2>LaswI AI</h2>
@@ -307,7 +324,7 @@
             <div style="margin-top: 20px;">
                 <button class="btn-primary" onclick="handleLogin()">登录</button>
                 <button class="btn-secondary" onclick="handleRegister()">注册</button>
-                <button class="btn-secondary" onclick="closeAuthModal()" style="margin-top:8px;">取消</button>
+                <button class="btn-secondary" onclick="closeAuthModal()">取消</button>
             </div>
             <p id="authError"></p>
         </div>
@@ -322,6 +339,8 @@
             </div>
             <div id="user-info">
                 <span id="username-display"></span>
+                <!-- 全局自动朗读开关 -->
+                <button id="auto-speak-toggle" onclick="toggleAutoSpeak()" title="自动朗读新消息">🔇</button>
                 <button id="auth-btn" onclick="showAuthModal()">登录 / 注册</button>
                 <button id="logoutBtn" onclick="logout()" style="display: none;">退出</button>
             </div>
@@ -329,15 +348,16 @@
         <div id="chat-box"></div>
         <div class="input-area">
             <input type="text" id="user-input" placeholder="输入你的问题..." autofocus>
-            <button id="send-btn">发送</button>
+            <button id="send-btn" onclick="sendMessage()">发送</button>
         </div>
     </div>
 
     <script>
         // ---------- 全局变量 ----------
         let token = localStorage.getItem('token');
-        let currentUser = null; // { id, username }
+        let currentUser = null;
         let messages = [{ role: 'system', content: '你叫LaswI，是一个由腾讯混元大模型驱动的智能助手。请用友好、温暖、专业的中文回答用户问题。' }];
+        let isAutoSpeakOn = false; // 自动朗读开关，默认关闭
 
         // DOM 元素
         const authModal = document.getElementById('authModal');
@@ -348,18 +368,17 @@
         const authError = document.getElementById('authError');
         const authBtn = document.getElementById('auth-btn');
         const logoutBtn = document.getElementById('logoutBtn');
-        const usernameDisplay = document.getElementById('usernameDisplay');
+        const usernameDisplay = document.getElementById('username-display');
+        const autoSpeakToggle = document.getElementById('auto-speak-toggle');
 
-        // ---------- 初始化：解析token并加载用户信息 ----------
+        // ---------- 初始化 ----------
         if (token) {
-            // 解析token获取用户信息（不向后端请求）
             try {
                 const payload = JSON.parse(atob(token.split('.')[1]));
                 currentUser = { id: payload.userId, username: payload.username };
                 updateUIForUser();
-                fetchHistory(); // 加载历史记录
+                fetchHistory();
             } catch (e) {
-                // token无效，清除
                 localStorage.removeItem('token');
                 token = null;
                 updateUIForGuest();
@@ -368,7 +387,6 @@
             updateUIForGuest();
         }
 
-        // ---------- 更新UI根据登录状态 ----------
         function updateUIForUser() {
             authBtn.style.display = 'none';
             logoutBtn.style.display = 'inline-block';
@@ -380,19 +398,16 @@
             usernameDisplay.textContent = '';
         }
 
-        // ---------- 模态框控制 ----------
-        function showAuthModal() {
-            authModal.style.display = 'flex';
-        }
-        function closeAuthModal() {
+        // 模态框控制
+        window.showAuthModal = () => authModal.style.display = 'flex';
+        window.closeAuthModal = () => {
             authModal.style.display = 'none';
             authError.innerText = '';
             document.getElementById('authUsername').value = '';
             document.getElementById('authPassword').value = '';
-        }
-        window.closeAuthModal = closeAuthModal; // 暴露给onclick
+        };
 
-        // ---------- 登录请求 ----------
+        // 登录
         async function handleLogin() {
             const username = document.getElementById('authUsername').value.trim();
             const password = document.getElementById('authPassword').value;
@@ -413,20 +428,18 @@
                     currentUser = data.user;
                     closeAuthModal();
                     updateUIForUser();
-                    // 清空当前对话（游客的对话不保留）
                     messages = [{ role: 'system', content: messages[0].content }];
                     renderMessages();
-                    await fetchHistory(); // 加载历史记录
+                    await fetchHistory();
                 } else {
                     authError.innerText = data.error || '登录失败';
                 }
             } catch (err) {
                 authError.innerText = '网络错误，请重试';
-                console.error(err);
             }
         }
 
-        // ---------- 注册请求 ----------
+        // 注册
         async function handleRegister() {
             const username = document.getElementById('authUsername').value.trim();
             const password = document.getElementById('authPassword').value;
@@ -447,7 +460,6 @@
                     currentUser = data.user;
                     closeAuthModal();
                     updateUIForUser();
-                    // 新用户无历史，清空游客对话
                     messages = [{ role: 'system', content: messages[0].content }];
                     renderMessages();
                 } else {
@@ -455,49 +467,72 @@
                 }
             } catch (err) {
                 authError.innerText = '网络错误，请重试';
-                console.error(err);
             }
         }
 
-        // ---------- 退出登录 ----------
-        function logout() {
+        window.handleLogin = handleLogin;
+        window.handleRegister = handleRegister;
+
+        // 退出
+        window.logout = () => {
             localStorage.removeItem('token');
             token = null;
             currentUser = null;
             updateUIForGuest();
-            // 清空聊天记录（游客模式重新开始）
             messages = [{ role: 'system', content: messages[0].content }];
             renderMessages();
-        }
+        };
 
-        // ---------- 加载历史记录 ----------
-        async function fetchHistory() {
-            if (!token) return;
-            try {
-                const res = await fetch('/api/history', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) {
-                    if (res.status === 401) {
-                        // token无效
-                        logout();
-                    }
-                    return;
-                }
-                const history = await res.json(); // 数组 { role, content }
-                // 重建messages：系统消息 + 历史
-                messages = [{ role: 'system', content: messages[0].content }, ...history];
-                renderMessages();
-            } catch (err) {
-                console.error('加载历史失败', err);
+        // ---------- 全局自动朗读开关 ----------
+        window.toggleAutoSpeak = () => {
+            isAutoSpeakOn = !isAutoSpeakOn;
+            autoSpeakToggle.textContent = isAutoSpeakOn ? '🔊' : '🔇';
+            autoSpeakToggle.classList.toggle('on', isAutoSpeakOn);
+        };
+
+        // ---------- 朗读功能 ----------
+        function speakText(text, speakerElement) {
+            if (!window.speechSynthesis) {
+                alert('您的浏览器不支持语音朗读功能');
+                return;
             }
+
+            // 如果正在朗读，停止它
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+                // 移除所有喇叭的高亮
+                document.querySelectorAll('.speaker-icon').forEach(el => el.classList.remove('speaking'));
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-CN';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+
+            // 尝试选中文声音
+            const voices = speechSynthesis.getVoices();
+            const chineseVoice = voices.find(v => v.lang.includes('zh'));
+            if (chineseVoice) utterance.voice = chineseVoice;
+
+            utterance.onstart = () => {
+                if (speakerElement) speakerElement.classList.add('speaking');
+            };
+            utterance.onend = () => {
+                if (speakerElement) speakerElement.classList.remove('speaking');
+            };
+            utterance.onerror = () => {
+                if (speakerElement) speakerElement.classList.remove('speaking');
+            };
+
+            speechSynthesis.speak(utterance);
         }
 
-        // ---------- 渲染消息 ----------
+        // ---------- 渲染消息（含喇叭）----------
         function renderMessages() {
             chatBox.innerHTML = '';
             const displayMessages = messages.filter(m => m.role !== 'system');
-            displayMessages.forEach(msg => {
+            displayMessages.forEach((msg, index) => {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`;
 
@@ -511,31 +546,36 @@
 
                 messageDiv.appendChild(avatar);
                 messageDiv.appendChild(bubble);
+
+                // AI 消息加喇叭
+                if (msg.role === 'assistant') {
+                    const speaker = document.createElement('span');
+                    speaker.className = 'speaker-icon';
+                    speaker.textContent = '🔊';
+                    speaker.onclick = () => speakText(msg.content, speaker);
+                    messageDiv.appendChild(speaker);
+                }
+
                 chatBox.appendChild(messageDiv);
             });
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // ---------- 显示/移除加载指示器 ----------
-        function showLoadingIndicator() {
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message assistant-message';
-            loadingDiv.id = 'loading-indicator';
-            loadingDiv.innerHTML = `
-                <div class="avatar">AI</div>
-                <div class="bubble">
-                    <div class="loading-dots">
-                        <span></span><span></span><span></span>
-                    </div>
-                </div>
-            `;
-            chatBox.appendChild(loadingDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function removeLoadingIndicator() {
-            const loading = document.getElementById('loading-indicator');
-            if (loading) loading.remove();
+        // ---------- 加载历史 ----------
+        async function fetchHistory() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const history = await res.json();
+                    messages = [{ role: 'system', content: messages[0].content }, ...history];
+                    renderMessages();
+                }
+            } catch (err) {
+                console.error(err);
+            }
         }
 
         // ---------- 发送消息 ----------
@@ -543,57 +583,58 @@
             const text = userInput.value.trim();
             if (!text) return;
 
-            // 禁用输入
             userInput.disabled = true;
             sendBtn.disabled = true;
 
-            // 将用户消息加入messages并渲染
             messages.push({ role: 'user', content: text });
             renderMessages();
             userInput.value = '';
 
-            // 显示“正在输入”
-            showLoadingIndicator();
+            // 显示加载动画
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant-message';
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>`;
+            chatBox.appendChild(loadingDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                const headers = {
-                    'Content-Type': 'application/json'
-                };
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
 
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: headers,
-                    body: JSON.stringify({ messages: messages }) // 发送整个历史
+                    body: JSON.stringify({ messages })
                 });
 
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.error || '请求失败');
-                }
+                document.getElementById('loading-indicator')?.remove();
+
+                if (!response.ok) throw new Error('请求失败');
 
                 const data = await response.json();
-                const reply = data.reply;
-
-                removeLoadingIndicator();
-                messages.push({ role: 'assistant', content: reply });
+                messages.push({ role: 'assistant', content: data.reply });
                 renderMessages();
-            } catch (error) {
-                console.error('聊天错误:', error);
-                removeLoadingIndicator();
 
+                // ---------- 自动朗读新消息 ----------
+                if (isAutoSpeakOn) {
+                    // 找到最后一条 AI 消息对应的喇叭元素
+                    const speakers = document.querySelectorAll('.speaker-icon');
+                    if (speakers.length > 0) {
+                        const lastSpeaker = speakers[speakers.length - 1];
+                        // 获取最后一条 AI 消息的内容
+                        const lastAssistantMsg = messages.filter(m => m.role === 'assistant').pop();
+                        if (lastAssistantMsg) {
+                            speakText(lastAssistantMsg.content, lastSpeaker);
+                        }
+                    }
+                }
+            } catch (error) {
+                document.getElementById('loading-indicator')?.remove();
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message assistant-message';
-                errorDiv.innerHTML = `
-                    <div class="avatar">AI</div>
-                    <div class="bubble" style="color:#dc3545;">
-                        😵 出错了：${error.message || '请稍后重试'}
-                    </div>
-                `;
+                errorDiv.innerHTML = `<div class="avatar">AI</div><div class="bubble" style="color:#dc3545;">😵 出错了：${error.message}</div>`;
                 chatBox.appendChild(errorDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
             } finally {
                 userInput.disabled = false;
                 sendBtn.disabled = false;
@@ -601,28 +642,18 @@
             }
         }
 
-        // ---------- 事件绑定 ----------
-        sendBtn.addEventListener('click', sendMessage);
+        // 回车发送
         userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter') {
                 e.preventDefault();
                 sendMessage();
             }
         });
 
-        // 模态框回车登录
-        document.getElementById('authPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleLogin();
-            }
-        });
-
-        // 暴露函数给全局
-        window.handleLogin = handleLogin;
-        window.handleRegister = handleRegister;
-        window.showAuthModal = showAuthModal;
-        window.logout = logout;
+        // 预加载声音列表
+        if (window.speechSynthesis) {
+            speechSynthesis.getVoices();
+        }
     </script>
 </body>
 </html>
