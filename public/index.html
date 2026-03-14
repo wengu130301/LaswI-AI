@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>LaswI AI · 智能助手</title>
     <style>
-        /* ========== 完整样式（和你之前正常时一样）========== */
+        /* 全局极简样式 */
         * {
             margin: 0;
             padding: 0;
@@ -19,6 +19,7 @@
             justify-content: center;
             align-items: center;
         }
+        /* 模态框样式 */
         .modal {
             display: none;
             position: fixed;
@@ -89,6 +90,8 @@
             margin-top: 12px;
             font-size: 0.9rem;
         }
+
+        /* 聊天容器 */
         .chat-container {
             width: 100%;
             max-width: 800px;
@@ -295,7 +298,7 @@
     </style>
 </head>
 <body>
-    <!-- 登录模态框 -->
+    <!-- 登录/注册模态框 -->
     <div id="authModal" class="modal">
         <div class="modal-content">
             <h2>LaswI AI</h2>
@@ -304,7 +307,7 @@
             <div style="margin-top: 20px;">
                 <button class="btn-primary" onclick="handleLogin()">登录</button>
                 <button class="btn-secondary" onclick="handleRegister()">注册</button>
-                <button class="btn-secondary" onclick="closeAuthModal()">取消</button>
+                <button class="btn-secondary" onclick="closeAuthModal()" style="margin-top:8px;">取消</button>
             </div>
             <p id="authError"></p>
         </div>
@@ -326,15 +329,14 @@
         <div id="chat-box"></div>
         <div class="input-area">
             <input type="text" id="user-input" placeholder="输入你的问题..." autofocus>
-            <!-- 关键修复：添加 onclick 属性，确保点击总能触发 sendMessage -->
-            <button id="send-btn" onclick="sendMessage()">发送</button>
+            <button id="send-btn">发送</button>
         </div>
     </div>
 
     <script>
         // ---------- 全局变量 ----------
         let token = localStorage.getItem('token');
-        let currentUser = null;
+        let currentUser = null; // { id, username }
         let messages = [{ role: 'system', content: '你叫LaswI，是一个由腾讯混元大模型驱动的智能助手。请用友好、温暖、专业的中文回答用户问题。' }];
 
         // DOM 元素
@@ -346,16 +348,18 @@
         const authError = document.getElementById('authError');
         const authBtn = document.getElementById('auth-btn');
         const logoutBtn = document.getElementById('logoutBtn');
-        const usernameDisplay = document.getElementById('username-display');
+        const usernameDisplay = document.getElementById('usernameDisplay');
 
-        // ---------- 初始化 ----------
+        // ---------- 初始化：解析token并加载用户信息 ----------
         if (token) {
+            // 解析token获取用户信息（不向后端请求）
             try {
                 const payload = JSON.parse(atob(token.split('.')[1]));
                 currentUser = { id: payload.userId, username: payload.username };
                 updateUIForUser();
-                fetchHistory();
+                fetchHistory(); // 加载历史记录
             } catch (e) {
+                // token无效，清除
                 localStorage.removeItem('token');
                 token = null;
                 updateUIForGuest();
@@ -364,6 +368,7 @@
             updateUIForGuest();
         }
 
+        // ---------- 更新UI根据登录状态 ----------
         function updateUIForUser() {
             authBtn.style.display = 'none';
             logoutBtn.style.display = 'inline-block';
@@ -375,16 +380,19 @@
             usernameDisplay.textContent = '';
         }
 
-        // 模态框控制
-        window.showAuthModal = () => authModal.style.display = 'flex';
-        window.closeAuthModal = () => {
+        // ---------- 模态框控制 ----------
+        function showAuthModal() {
+            authModal.style.display = 'flex';
+        }
+        function closeAuthModal() {
             authModal.style.display = 'none';
             authError.innerText = '';
             document.getElementById('authUsername').value = '';
             document.getElementById('authPassword').value = '';
-        };
+        }
+        window.closeAuthModal = closeAuthModal; // 暴露给onclick
 
-        // 登录
+        // ---------- 登录请求 ----------
         async function handleLogin() {
             const username = document.getElementById('authUsername').value.trim();
             const password = document.getElementById('authPassword').value;
@@ -405,18 +413,20 @@
                     currentUser = data.user;
                     closeAuthModal();
                     updateUIForUser();
+                    // 清空当前对话（游客的对话不保留）
                     messages = [{ role: 'system', content: messages[0].content }];
                     renderMessages();
-                    await fetchHistory();
+                    await fetchHistory(); // 加载历史记录
                 } else {
                     authError.innerText = data.error || '登录失败';
                 }
             } catch (err) {
                 authError.innerText = '网络错误，请重试';
+                console.error(err);
             }
         }
 
-        // 注册
+        // ---------- 注册请求 ----------
         async function handleRegister() {
             const username = document.getElementById('authUsername').value.trim();
             const password = document.getElementById('authPassword').value;
@@ -437,6 +447,7 @@
                     currentUser = data.user;
                     closeAuthModal();
                     updateUIForUser();
+                    // 新用户无历史，清空游客对话
                     messages = [{ role: 'system', content: messages[0].content }];
                     renderMessages();
                 } else {
@@ -444,35 +455,60 @@
                 }
             } catch (err) {
                 authError.innerText = '网络错误，请重试';
+                console.error(err);
             }
         }
 
-        window.handleLogin = handleLogin;
-        window.handleRegister = handleRegister;
-
-        // 退出
-        window.logout = () => {
+        // ---------- 退出登录 ----------
+        function logout() {
             localStorage.removeItem('token');
             token = null;
             currentUser = null;
             updateUIForGuest();
+            // 清空聊天记录（游客模式重新开始）
             messages = [{ role: 'system', content: messages[0].content }];
             renderMessages();
-        };
+        }
 
-        // 渲染
+        // ---------- 加载历史记录 ----------
+        async function fetchHistory() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        // token无效
+                        logout();
+                    }
+                    return;
+                }
+                const history = await res.json(); // 数组 { role, content }
+                // 重建messages：系统消息 + 历史
+                messages = [{ role: 'system', content: messages[0].content }, ...history];
+                renderMessages();
+            } catch (err) {
+                console.error('加载历史失败', err);
+            }
+        }
+
+        // ---------- 渲染消息 ----------
         function renderMessages() {
             chatBox.innerHTML = '';
             const displayMessages = messages.filter(m => m.role !== 'system');
             displayMessages.forEach(msg => {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`;
+
                 const avatar = document.createElement('div');
                 avatar.className = 'avatar';
                 avatar.textContent = msg.role === 'user' ? '我' : 'AI';
+
                 const bubble = document.createElement('div');
                 bubble.className = 'bubble';
                 bubble.textContent = msg.content;
+
                 messageDiv.appendChild(avatar);
                 messageDiv.appendChild(bubble);
                 chatBox.appendChild(messageDiv);
@@ -480,66 +516,84 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 加载历史
-        async function fetchHistory() {
-            if (!token) return;
-            try {
-                const res = await fetch('/api/history', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const history = await res.json();
-                    messages = [{ role: 'system', content: messages[0].content }, ...history];
-                    renderMessages();
-                }
-            } catch (err) {
-                console.error(err);
-            }
+        // ---------- 显示/移除加载指示器 ----------
+        function showLoadingIndicator() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant-message';
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.innerHTML = `
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <div class="loading-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            chatBox.appendChild(loadingDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 发送消息（已声明为全局函数，供 onclick 调用）
+        function removeLoadingIndicator() {
+            const loading = document.getElementById('loading-indicator');
+            if (loading) loading.remove();
+        }
+
+        // ---------- 发送消息 ----------
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
+            // 禁用输入
             userInput.disabled = true;
             sendBtn.disabled = true;
 
+            // 将用户消息加入messages并渲染
             messages.push({ role: 'user', content: text });
             renderMessages();
             userInput.value = '';
 
-            // 显示加载动画
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message assistant-message';
-            loadingDiv.id = 'loading-indicator';
-            loadingDiv.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>`;
-            chatBox.appendChild(loadingDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            // 显示“正在输入”
+            showLoadingIndicator();
 
             try {
-                const headers = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
 
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: headers,
-                    body: JSON.stringify({ messages })
+                    body: JSON.stringify({ messages: messages }) // 发送整个历史
                 });
 
-                document.getElementById('loading-indicator')?.remove();
-
-                if (!response.ok) throw new Error('请求失败');
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || '请求失败');
+                }
 
                 const data = await response.json();
-                messages.push({ role: 'assistant', content: data.reply });
+                const reply = data.reply;
+
+                removeLoadingIndicator();
+                messages.push({ role: 'assistant', content: reply });
                 renderMessages();
             } catch (error) {
-                document.getElementById('loading-indicator')?.remove();
+                console.error('聊天错误:', error);
+                removeLoadingIndicator();
+
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message assistant-message';
-                errorDiv.innerHTML = `<div class="avatar">AI</div><div class="bubble" style="color:#dc3545;">😵 出错了：${error.message}</div>`;
+                errorDiv.innerHTML = `
+                    <div class="avatar">AI</div>
+                    <div class="bubble" style="color:#dc3545;">
+                        😵 出错了：${error.message || '请稍后重试'}
+                    </div>
+                `;
                 chatBox.appendChild(errorDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
             } finally {
                 userInput.disabled = false;
                 sendBtn.disabled = false;
@@ -547,18 +601,28 @@
             }
         }
 
-        // 额外保险：同时保留 addEventListener，但 onclick 已经足够
-        if (sendBtn) {
-            sendBtn.addEventListener('click', sendMessage);
-        }
-
-        // 回车发送
+        // ---------- 事件绑定 ----------
+        sendBtn.addEventListener('click', sendMessage);
         userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
             }
         });
+
+        // 模态框回车登录
+        document.getElementById('authPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleLogin();
+            }
+        });
+
+        // 暴露函数给全局
+        window.handleLogin = handleLogin;
+        window.handleRegister = handleRegister;
+        window.showAuthModal = showAuthModal;
+        window.logout = logout;
     </script>
 </body>
 </html>
