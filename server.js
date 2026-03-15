@@ -136,7 +136,7 @@ const clientConfig = {
 };
 const client = new HunyuanClient(clientConfig);
 
-// ---------- 辅助函数：解析 token（异步，验证会话） ----------
+// ---------- 辅助函数：解析 JWT token（异步，验证会话） ----------
 const getUserFromToken = async (req) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -155,12 +155,31 @@ const getUserFromToken = async (req) => {
   }
 };
 
-// 认证中间件（异步）
+// Web 端认证中间件（使用 JWT）
 const requireAuth = async (req, res, next) => {
   const user = await getUserFromToken(req);
   if (!user) return res.status(401).json({ error: '未授权' });
   req.user = user;
   next();
+};
+
+// ---------- API 令牌认证中间件（用于快捷指令）----------
+const authenticateApiToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: '缺少令牌' });
+
+  try {
+    const result = await pool.query('SELECT id FROM users WHERE api_token = $1', [token]);
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: '令牌无效' });
+    }
+    req.userId = result.rows[0].id; // 供后续路由使用
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '服务器错误' });
+  }
 };
 
 // ---------- 用户认证接口 ----------
@@ -251,7 +270,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// 获取历史记录
+// 获取历史记录（Web端使用 JWT）
 app.get('/api/history', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -266,7 +285,7 @@ app.get('/api/history', requireAuth, async (req, res) => {
 });
 
 // ---------- 二维码相关接口 ----------
-// 生成二维码
+// 生成二维码（Web端使用 JWT）
 app.get('/api/qr/generate', requireAuth, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -290,7 +309,7 @@ app.get('/api/qr/generate', requireAuth, async (req, res) => {
   }
 });
 
-// 扫码登录
+// 扫码登录（无认证）
 app.post('/api/qr/login', async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: '缺少code' });
@@ -330,7 +349,7 @@ app.post('/api/qr/login', async (req, res) => {
 });
 
 // ---------- 用户令牌接口（供快捷指令使用）----------
-// 获取或生成用户的 API 令牌
+// 获取或生成用户的 API 令牌（Web端使用 JWT）
 app.get('/api/user/token', requireAuth, async (req, res) => {
   const userId = req.user.userId;
   try {
@@ -349,10 +368,10 @@ app.get('/api/user/token', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 数字系列 API ----------
+// ---------- 数字系列 API（使用 API 令牌认证）----------
 // 获取用户配置
-app.get('/api/digital/config', requireAuth, async (req, res) => {
-  const userId = req.user.userId;
+app.get('/api/digital/config', authenticateApiToken, async (req, res) => {
+  const userId = req.userId;
   try {
     let result = await pool.query('SELECT * FROM digital_config WHERE user_id = $1', [userId]);
     if (result.rows.length === 0) {
@@ -371,8 +390,8 @@ app.get('/api/digital/config', requireAuth, async (req, res) => {
 });
 
 // 更新功能开关
-app.post('/api/digital/config', requireAuth, async (req, res) => {
-  const userId = req.user.userId;
+app.post('/api/digital/config', authenticateApiToken, async (req, res) => {
+  const userId = req.userId;
   const { features } = req.body;
   try {
     await pool.query(
@@ -386,7 +405,7 @@ app.post('/api/digital/config', requireAuth, async (req, res) => {
   }
 });
 
-// 获取最新版本信息
+// 获取最新版本信息（公开，无需认证）
 app.get('/api/digital/latest-version', (req, res) => {
   // 可以从数据库动态读取，先硬编码示例
   res.json({
@@ -396,9 +415,9 @@ app.get('/api/digital/latest-version', (req, res) => {
   });
 });
 
-// 上报当前版本（供快捷指令调用）
-app.post('/api/digital/report-version', requireAuth, async (req, res) => {
-  const userId = req.user.userId;
+// 上报当前版本（快捷指令调用）
+app.post('/api/digital/report-version', authenticateApiToken, async (req, res) => {
+  const userId = req.userId;
   const { version } = req.body;
   try {
     await pool.query(
