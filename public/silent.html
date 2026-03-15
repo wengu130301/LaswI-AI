@@ -35,7 +35,7 @@
 <body>
     <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
     <div class="container">
-        <h1>🔇 Silent 系列</h1>
+        <h1>🐾 Silent 系列</h1>
         <div class="subtitle">管理静音与弹窗规则</div>
         <div class="card">
             <h3>🔑 你的 API 令牌</h3>
@@ -91,7 +91,7 @@
         function renderFeatures(features) {
             const container = document.getElementById('featuresContainer');
             container.innerHTML = '';
-            const labels = { mute_enabled: '静音模式', block_popups: '屏蔽弹窗' };
+            const labels = { mute_enabled: '重要提醒', block_popups: '屏蔽弹窗' };
             for (let key in features) {
                 container.innerHTML += `
                     <div class="feature-item">
