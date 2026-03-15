@@ -100,7 +100,7 @@ const pool = new Pool({
     `);
     console.log('✅ 索引 idx_scan_codes_code 已就绪');
 
-    // digital_config 表（用于数字系列配置）
+    // digital_config 表（数字系列）
     await pool.query(`
       CREATE TABLE IF NOT EXISTS digital_config (
         id SERIAL PRIMARY KEY,
@@ -112,6 +112,32 @@ const pool = new Pool({
       );
     `);
     console.log('✅ 表 digital_config 已就绪');
+
+    // silent_config 表（Silent 系列）
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS silent_config (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        current_version VARCHAR(20) DEFAULT '1.0',
+        features JSONB DEFAULT '{}',
+        last_check TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id)
+      );
+    `);
+    console.log('✅ 表 silent_config 已就绪');
+
+    // pro_config 表（Pro 系列）
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pro_config (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        current_version VARCHAR(20) DEFAULT '1.0',
+        features JSONB DEFAULT '{}',
+        last_check TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id)
+      );
+    `);
+    console.log('✅ 表 pro_config 已就绪');
 
   } catch (err) {
     console.error('❌ 自动建表失败:', err);
@@ -381,8 +407,7 @@ app.get('/api/user/token', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 数字系列 API（使用混合认证，支持 Web 和快捷指令）----------
-// 获取用户配置
+// ---------- 数字系列 API ----------
 app.get('/api/digital/config', authenticateWebOrApi, async (req, res) => {
   const userId = req.userId;
   try {
@@ -402,7 +427,6 @@ app.get('/api/digital/config', authenticateWebOrApi, async (req, res) => {
   }
 });
 
-// 更新功能开关
 app.post('/api/digital/config', authenticateWebOrApi, async (req, res) => {
   const userId = req.userId;
   const { features } = req.body;
@@ -418,29 +442,87 @@ app.post('/api/digital/config', authenticateWebOrApi, async (req, res) => {
   }
 });
 
-// 获取最新版本信息（公开，无需认证）
-app.get('/api/digital/latest-version', (req, res) => {
-  res.json({
-    version: '2.0',
-    release_notes: '新增语音播报功能，优化稳定性',
-    force_update: false
-  });
+// ---------- Silent 系列 API ----------
+app.get('/api/silent/config', authenticateWebOrApi, async (req, res) => {
+  const userId = req.userId;
+  try {
+    let result = await pool.query('SELECT * FROM silent_config WHERE user_id = $1', [userId]);
+    if (result.rows.length === 0) {
+      const defaultFeatures = { mute_enabled: false, block_popups: false };
+      await pool.query(
+        'INSERT INTO silent_config (user_id, current_version, features) VALUES ($1, $2, $3)',
+        [userId, '1.0', defaultFeatures]
+      );
+      result = await pool.query('SELECT * FROM silent_config WHERE user_id = $1', [userId]);
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '获取配置失败' });
+  }
 });
 
-// 上报当前版本（快捷指令调用）
-app.post('/api/digital/report-version', authenticateWebOrApi, async (req, res) => {
+app.post('/api/silent/config', authenticateWebOrApi, async (req, res) => {
   const userId = req.userId;
-  const { version } = req.body;
+  const { features } = req.body;
   try {
     await pool.query(
-      'UPDATE digital_config SET current_version = $1, last_check = NOW() WHERE user_id = $2',
-      [version, userId]
+      'UPDATE silent_config SET features = $1 WHERE user_id = $2',
+      [features, userId]
     );
     res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: '上报失败' });
+    res.status(500).json({ error: '更新配置失败' });
   }
+});
+
+// ---------- Pro 系列 API ----------
+app.get('/api/pro/config', authenticateWebOrApi, async (req, res) => {
+  const userId = req.userId;
+  try {
+    let result = await pool.query('SELECT * FROM pro_config WHERE user_id = $1', [userId]);
+    if (result.rows.length === 0) {
+      const defaultFeatures = { advanced_mode: true, custom_theme: 'light' };
+      await pool.query(
+        'INSERT INTO pro_config (user_id, current_version, features) VALUES ($1, $2, $3)',
+        [userId, '1.0', defaultFeatures]
+      );
+      result = await pool.query('SELECT * FROM pro_config WHERE user_id = $1', [userId]);
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '获取配置失败' });
+  }
+});
+
+app.post('/api/pro/config', authenticateWebOrApi, async (req, res) => {
+  const userId = req.userId;
+  const { features } = req.body;
+  try {
+    await pool.query(
+      'UPDATE pro_config SET features = $1 WHERE user_id = $2',
+      [features, userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '更新配置失败' });
+  }
+});
+
+// ---------- 可选：最新版本接口（可根据需要扩展）----------
+app.get('/api/digital/latest-version', (req, res) => {
+  res.json({ version: '2.0', release_notes: '新增语音播报功能' });
+});
+
+app.get('/api/silent/latest-version', (req, res) => {
+  res.json({ version: '1.5', release_notes: '优化静音逻辑' });
+});
+
+app.get('/api/pro/latest-version', (req, res) => {
+  res.json({ version: '3.0', release_notes: '高级个性化选项' });
 });
 
 // ---------- 环境变量检查 ----------
