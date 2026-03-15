@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>LaswI AI · 智能助手</title>
     <style>
-        /* ========== 全局样式变量（支持暗色模式）========== */
+        /* ========== 全局样式变量 ========== */
         :root {
             --bg-color: #f0f2f5;
             --container-bg: white;
@@ -249,9 +249,6 @@
         #voice-btn {
             font-size: 1.2rem;
         }
-        #qr-link {
-            text-decoration: none;
-        }
 
         #chat-box {
             flex: 1;
@@ -473,7 +470,11 @@
             </div>
             <div id="user-info">
                 <span id="username-display"></span>
-                <!-- 数字系列入口（新增） -->
+                <!-- Silent 入口 -->
+                <a href="/silent.html" class="icon-btn" style="text-decoration: none;">🐾Silent</a>
+                <!-- Pro 入口 -->
+                <a href="/pro.html" class="icon-btn" style="text-decoration: none;">⭐Pro</a>
+                <!-- 数字系列入口 -->
                 <a href="/digital.html" class="icon-btn" style="text-decoration: none;">📱数字</a>
                 <!-- 暗色模式切换按钮 -->
                 <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()" title="切换主题">🌙</button>

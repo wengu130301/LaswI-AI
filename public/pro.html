@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro 系列 · LaswI Cloud</title>
+    <style>
+        :root { --bg-color: #f0f2f5; --container-bg: white; --text-primary: #1e1e1e; --text-secondary: #666; --border-light: #ddd; --card-bg: #f8f9fa; --btn-primary: #0066ff; --btn-primary-hover: #0052cc; --success-bg: #d4edda; --success-text: #155724; --error-bg: #f8d7da; --error-text: #721c24; }
+        [data-theme="dark"] { --bg-color: #1a1a1a; --container-bg: #2d2d2d; --text-primary: #e0e0e0; --text-secondary: #b0b0b0; --border-light: #404040; --card-bg: #3a3a3a; --btn-primary: #0066ff; --btn-primary-hover: #0052cc; --success-bg: #1e3a2a; --success-text: #8bc34a; --error-bg: #3f2a2a; --error-text: #ff6b6b; }
+        body { font-family: system-ui; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-primary); transition: 0.2s; }
+        .container { max-width: 600px; margin: 0 auto; background: var(--container-bg); border-radius: 28px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
+        h1 { font-size: 2rem; margin-bottom: 10px; background: linear-gradient(135deg, #0066ff, #5f9eff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { color: var(--text-secondary); margin-bottom: 30px; }
+        .card { background: var(--card-bg); border-radius: 20px; padding: 20px; margin-bottom: 20px; }
+        .token-box { background: var(--card-bg); border-radius: 12px; padding: 15px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border-light); }
+        .token-text { font-family: monospace; word-break: break-all; font-size: 0.9rem; color: var(--btn-primary); background: var(--container-bg); padding: 8px 12px; border-radius: 30px; flex:1; }
+        .copy-btn { background: var(--btn-primary); color: white; border: none; border-radius: 30px; padding: 8px 20px; cursor: pointer; }
+        .copy-btn:hover { background: var(--btn-primary-hover); }
+        .feature-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
+        .switch { position: relative; display: inline-block; width: 52px; height: 26px; }
+        .switch input { opacity:0; width:0; height:0; }
+        .slider { position: absolute; cursor: pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.2s; border-radius:26px; }
+        .slider:before { position: absolute; content:""; height:20px; width:20px; left:3px; bottom:3px; background-color:white; transition:.2s; border-radius:50%; }
+        input:checked + .slider { background-color: var(--btn-primary); }
+        input:checked + .slider:before { transform: translateX(26px); }
+        .btn-save { background: var(--btn-primary); color: white; border: none; border-radius: 30px; padding: 14px; font-size: 1rem; width: 100%; cursor: pointer; margin-top:20px; }
+        .btn-save:hover { background: var(--btn-primary-hover); }
+        .message { margin-top:20px; padding:12px; border-radius:12px; display:none; text-align:center; }
+        .success { background: var(--success-bg); color: var(--success-text); display:block; }
+        .error { background: var(--error-bg); color: var(--error-text); display:block; }
+        .note { color: var(--text-secondary); font-size:0.85rem; margin-top:20px; text-align:center; }
+        .theme-toggle { position:fixed; top:20px; right:20px; background: var(--container-bg); border:1px solid var(--border-light); border-radius:30px; padding:8px 16px; cursor:pointer; z-index:1000; }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    <div class="container">
+        <h1>⭐ Pro 系列</h1>
+        <div class="subtitle">高级个性化设置</div>
+        <div class="card">
+            <h3>🔑 你的 API 令牌</h3>
+            <div class="token-box">
+                <span id="apiToken" class="token-text">加载中...</span>
+                <button class="copy-btn" onclick="copyToken()">复制</button>
+            </div>
+        </div>
+        <div class="card">
+            <h3>⚙️ 功能开关</h3>
+            <div id="featuresContainer"></div>
+        </div>
+        <button class="btn-save" onclick="saveConfig()">保存设置</button>
+        <div id="message" class="message"></div>
+        <div class="note">* 修改后请在快捷指令中重新运行以生效</div>
+    </div>
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) { alert('请先登录'); window.location.href = '/'; }
+        let features = {};
+        let theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.querySelector('.theme-toggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+        window.toggleTheme = () => {
+            theme = theme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            document.querySelector('.theme-toggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+        };
+        async function loadToken() {
+            try {
+                const res = await fetch('/api/user/token', { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                document.getElementById('apiToken').textContent = data.token || '获取失败';
+            } catch { document.getElementById('apiToken').textContent = '网络错误'; }
+        }
+        window.copyToken = () => {
+            const text = document.getElementById('apiToken').textContent;
+            if (text && !text.includes('加载') && !text.includes('失败')) {
+                navigator.clipboard.writeText(text).then(() => alert('已复制'));
+            }
+        };
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/pro/config', { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                if (res.ok) {
+                    features = data.features || { advanced_mode: true, custom_theme: 'light' };
+                    renderFeatures(features);
+                } else showMessage('加载失败', 'error');
+            } catch { showMessage('网络错误', 'error'); }
+        }
+        function renderFeatures(features) {
+            const container = document.getElementById('featuresContainer');
+            container.innerHTML = '';
+            const labels = { advanced_mode: '高级模式', custom_theme: '自定义主题' };
+            for (let key in features) {
+                // 简单处理布尔开关，如果值是字符串（如主题）可以单独处理，这里简化为开关
+                if (typeof features[key] === 'boolean') {
+                    container.innerHTML += `
+                        <div class="feature-item">
+                            <span>${labels[key] || key}</span>
+                            <label class="switch">
+                                <input type="checkbox" data-key="${key}" ${features[key] ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    `;
+                } else {
+                    // 对于非布尔值（如字符串）可以显示为只读文本或输入框，这里简化
+                    container.innerHTML += `
+                        <div class="feature-item">
+                            <span>${labels[key] || key}</span>
+                            <span>${features[key]}</span>
+                        </div>
+                    `;
+                }
+            }
+        }
+        window.saveConfig = () => {
+            const newFeatures = {};
+            document.querySelectorAll('#featuresContainer input[type=checkbox]').forEach(cb => {
+                newFeatures[cb.dataset.key] = cb.checked;
+            });
+            fetch('/api/pro/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ features: newFeatures })
+            })
+            .then(res => res.json())
+            .then(data => showMessage(data.success ? '保存成功' : '保存失败', data.success ? 'success' : 'error'))
+            .catch(() => showMessage('网络错误', 'error'));
+        };
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type}`;
+            setTimeout(() => msg.className = 'message', 3000);
+        }
+        loadToken();
+        loadConfig();
+    </script>
+</body>
+</html>
