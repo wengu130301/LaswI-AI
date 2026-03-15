@@ -332,10 +332,10 @@
         function renderFeatures(features) {
             const container = document.getElementById('featuresContainer');
             container.innerHTML = '';
+            // 映射后端字段名到前端显示文字
             const featureLabels = {
-                voice_enabled: '语音播报',
-                notification_enabled: '通知提醒'
-                // 可根据需要添加更多
+                voice_enabled: '整点播报',
+                notification_enabled: '90%电量提示'
             };
             for (let key in features) {
                 const label = featureLabels[key] || key;
