@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字系列 · LaswI Cloud</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            color: #1e1e1e;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 28px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #0066ff, #5f9eff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1rem;
+        }
+        .card {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            color: #333;
+        }
+        .token-box {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .token-text {
+            font-family: monospace;
+            word-break: break-all;
+            font-size: 0.9rem;
+            color: #0066ff;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 30px;
+            border: 1px solid #ddd;
+            flex: 1;
+        }
+        .copy-btn {
+            background: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #0052cc;
+        }
+        .version-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .badge {
+            background: #e9ecef;
+            color: #495057;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+        }
+        .update-available {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px 15px;
+            border-radius: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+        .feature-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .feature-item:last-child {
+            border-bottom: none;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 26px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .2s;
+            border-radius: 26px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #0066ff;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .btn-save {
+            background: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 14px 30px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        .btn-save:hover {
+            background: #0052cc;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 12px;
+            display: none;
+            text-align: center;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+        .note {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 数字系列</h1>
+        <div class="subtitle">管理你的快捷指令配置，所有更改自动同步到设备</div>
+
+        <!-- API 令牌卡片 -->
+        <div class="card">
+            <h3>🔑 你的 API 令牌</h3>
+            <p style="color:#666; margin-bottom:10px;">在快捷指令中添加此令牌以连接 Cloud</p>
+            <div class="token-box">
+                <span id="apiToken" class="token-text">加载中...</span>
+                <button class="copy-btn" onclick="copyToken()">复制</button>
+            </div>
+        </div>
+
+        <!-- 版本信息卡片 -->
+        <div class="card">
+            <h3>📦 版本信息</h3>
+            <div class="version-info">
+                <span>当前版本：<strong id="currentVersion">-</strong></span>
+                <span class="badge" id="latestVersionBadge">最新版本：-</span>
+            </div>
+            <div id="updateMessage" class="update-available"></div>
+        </div>
+
+        <!-- 功能开关卡片 -->
+        <div class="card">
+            <h3>⚙️ 功能开关</h3>
+            <div id="featuresContainer"></div>
+        </div>
+
+        <button class="btn-save" onclick="saveConfig()">保存设置</button>
+        <div id="message" class="message"></div>
+        <div class="note">* 修改后请在快捷指令中重新运行以生效</div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            alert('请先登录');
+            window.location.href = '/';
+        }
+
+        let features = {};
+
+        // 加载 API 令牌
+        async function loadToken() {
+            try {
+                const res = await fetch('/api/user/token', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('apiToken').textContent = data.token;
+                } else {
+                    document.getElementById('apiToken').textContent = '获取失败';
+                }
+            } catch (err) {
+                document.getElementById('apiToken').textContent = '网络错误';
+            }
+        }
+
+        // 复制令牌
+        window.copyToken = () => {
+            const tokenText = document.getElementById('apiToken').textContent;
+            if (tokenText && tokenText !== '加载中...' && tokenText !== '获取失败' && tokenText !== '网络错误') {
+                navigator.clipboard.writeText(tokenText).then(() => {
+                    alert('令牌已复制到剪贴板');
+                }).catch(() => {
+                    alert('复制失败，请手动复制');
+                });
+            }
+        };
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/digital/config', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('currentVersion').textContent = data.current_version || '1.0';
+                    features = data.features || { voice_enabled: false, notification_enabled: true };
+                    renderFeatures(features);
+                } else {
+                    showMessage('加载配置失败', 'error');
+                }
+            } catch (err) {
+                showMessage('网络错误', 'error');
+            }
+        }
+
+        function renderFeatures(features) {
+            const container = document.getElementById('featuresContainer');
+            container.innerHTML = '';
+            const featureLabels = {
+                voice_enabled: '语音播报',
+                notification_enabled: '通知提醒'
+                // 可根据需要添加更多
+            };
+            for (let key in features) {
+                const label = featureLabels[key] || key;
+                const div = document.createElement('div');
+                div.className = 'feature-item';
+                div.innerHTML = `
+                    <span>${label}</span>
+                    <label class="switch">
+                        <input type="checkbox" data-key="${key}" ${features[key] ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        // 加载最新版本信息
+        async function loadLatestVersion() {
+            try {
+                const res = await fetch('/api/digital/latest-version');
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('latestVersionBadge').textContent = `最新版本：${data.version}`;
+                    const currentVer = document.getElementById('currentVersion').textContent;
+                    if (currentVer !== '-' && data.version !== currentVer) {
+                        document.getElementById('updateMessage').innerHTML = `
+                            🚀 发现新版本 ${data.version}！<br>
+                            ${data.release_notes || ''}
+                        `;
+                        document.getElementById('updateMessage').style.display = 'block';
+                    } else {
+                        document.getElementById('updateMessage').style.display = 'none';
+                    }
+                }
+            } catch (err) {
+                console.error('加载最新版本失败');
+            }
+        }
+
+        // 保存配置
+        window.saveConfig = () => {
+            const checkboxes = document.querySelectorAll('#featuresContainer input[type=checkbox]');
+            const newFeatures = {};
+            checkboxes.forEach(cb => {
+                newFeatures[cb.dataset.key] = cb.checked;
+            });
+
+            fetch('/api/digital/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ features: newFeatures })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('保存成功！', 'success');
+                } else {
+                    showMessage('保存失败', 'error');
+                }
+            })
+            .catch(() => showMessage('网络错误', 'error'));
+        };
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type}`;
+            setTimeout(() => {
+                msg.className = 'message';
+            }, 3000);
+        }
+
+        // 初始化
+        loadToken();
+        loadConfig().then(() => loadLatestVersion());
+    </script>
+</body>
+</html>
