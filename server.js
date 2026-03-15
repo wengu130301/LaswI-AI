@@ -163,22 +163,35 @@ const requireAuth = async (req, res, next) => {
   next();
 };
 
-// ---------- API 令牌认证中间件（用于快捷指令）----------
-const authenticateApiToken = async (req, res, next) => {
+// ---------- 混合认证中间件：先尝试 JWT，再尝试 API 令牌 ----------
+const authenticateWebOrApi = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: '缺少令牌' });
+  if (!token) return res.status(401).json({ error: '缺少认证信息' });
 
+  // 先尝试作为 JWT 验证（Web 端登录）
   try {
-    const result = await pool.query('SELECT id FROM users WHERE api_token = $1', [token]);
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: '令牌无效' });
+    const decoded = jwt.verify(token, JWT_SECRET);
+    // 可选：检查会话是否有效（如果需要）
+    const result = await pool.query('SELECT current_session FROM users WHERE id = $1', [decoded.userId]);
+    const currentSession = result.rows[0]?.current_session;
+    if (currentSession && currentSession !== decoded.sessionId) {
+      return res.status(401).json({ error: '会话已过期，请重新登录' });
     }
-    req.userId = result.rows[0].id; // 供后续路由使用
-    next();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: '服务器错误' });
+    req.userId = decoded.userId;
+    return next();
+  } catch (jwtErr) {
+    // JWT 验证失败，尝试作为 API 令牌
+    try {
+      const result = await pool.query('SELECT id FROM users WHERE api_token = $1', [token]);
+      if (result.rows.length === 0) {
+        return res.status(401).json({ error: '认证无效' });
+      }
+      req.userId = result.rows[0].id;
+      return next();
+    } catch (apiErr) {
+      return res.status(401).json({ error: '认证失败' });
+    }
   }
 };
 
@@ -368,9 +381,9 @@ app.get('/api/user/token', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 数字系列 API（使用 API 令牌认证）----------
+// ---------- 数字系列 API（使用混合认证，支持 Web 和快捷指令）----------
 // 获取用户配置
-app.get('/api/digital/config', authenticateApiToken, async (req, res) => {
+app.get('/api/digital/config', authenticateWebOrApi, async (req, res) => {
   const userId = req.userId;
   try {
     let result = await pool.query('SELECT * FROM digital_config WHERE user_id = $1', [userId]);
@@ -390,7 +403,7 @@ app.get('/api/digital/config', authenticateApiToken, async (req, res) => {
 });
 
 // 更新功能开关
-app.post('/api/digital/config', authenticateApiToken, async (req, res) => {
+app.post('/api/digital/config', authenticateWebOrApi, async (req, res) => {
   const userId = req.userId;
   const { features } = req.body;
   try {
@@ -407,7 +420,6 @@ app.post('/api/digital/config', authenticateApiToken, async (req, res) => {
 
 // 获取最新版本信息（公开，无需认证）
 app.get('/api/digital/latest-version', (req, res) => {
-  // 可以从数据库动态读取，先硬编码示例
   res.json({
     version: '2.0',
     release_notes: '新增语音播报功能，优化稳定性',
@@ -416,7 +428,7 @@ app.get('/api/digital/latest-version', (req, res) => {
 });
 
 // 上报当前版本（快捷指令调用）
-app.post('/api/digital/report-version', authenticateApiToken, async (req, res) => {
+app.post('/api/digital/report-version', authenticateWebOrApi, async (req, res) => {
   const userId = req.userId;
   const { version } = req.body;
   try {
