@@ -57,6 +57,18 @@ const pool = new Pool({
       }
     }
 
+    // 添加 api_token 字段（用于快捷指令认证）
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN api_token VARCHAR(64) UNIQUE;`);
+      console.log('✅ 字段 api_token 已添加到 users');
+    } catch (err) {
+      if (!err.message.includes('already exists')) {
+        console.error('添加字段 api_token 时出错:', err);
+      } else {
+        console.log('ℹ️ 字段 api_token 已存在');
+      }
+    }
+
     // conversations 表
     await pool.query(`
       CREATE TABLE IF NOT EXISTS conversations (
@@ -69,7 +81,7 @@ const pool = new Pool({
     `);
     console.log('✅ 表 conversations 已就绪');
 
-    // scan_codes 表
+    // scan_codes 表（用于二维码登录）
     await pool.query(`
       CREATE TABLE IF NOT EXISTS scan_codes (
         id SERIAL PRIMARY KEY,
@@ -82,11 +94,24 @@ const pool = new Pool({
     `);
     console.log('✅ 表 scan_codes 已就绪');
 
-    // 索引
+    // 为 scan_codes 表创建索引
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_scan_codes_code ON scan_codes(code);
     `);
     console.log('✅ 索引 idx_scan_codes_code 已就绪');
+
+    // digital_config 表（用于数字系列配置）
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS digital_config (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        current_version VARCHAR(20) DEFAULT '1.0',
+        features JSONB DEFAULT '{}',
+        last_check TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id)
+      );
+    `);
+    console.log('✅ 表 digital_config 已就绪');
 
   } catch (err) {
     console.error('❌ 自动建表失败:', err);
@@ -304,7 +329,90 @@ app.post('/api/qr/login', async (req, res) => {
   }
 });
 
-// ---------- 可选：添加环境变量 BASE_URL 检查 ----------
+// ---------- 用户令牌接口（供快捷指令使用）----------
+// 获取或生成用户的 API 令牌
+app.get('/api/user/token', requireAuth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    // 查询是否已有令牌
+    const result = await pool.query('SELECT api_token FROM users WHERE id = $1', [userId]);
+    let token = result.rows[0]?.api_token;
+    if (!token) {
+      // 生成新令牌
+      token = crypto.randomBytes(32).toString('hex');
+      await pool.query('UPDATE users SET api_token = $1 WHERE id = $2', [token, userId]);
+    }
+    res.json({ token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '获取令牌失败' });
+  }
+});
+
+// ---------- 数字系列 API ----------
+// 获取用户配置
+app.get('/api/digital/config', requireAuth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    let result = await pool.query('SELECT * FROM digital_config WHERE user_id = $1', [userId]);
+    if (result.rows.length === 0) {
+      const defaultFeatures = { voice_enabled: false, notification_enabled: true };
+      await pool.query(
+        'INSERT INTO digital_config (user_id, current_version, features) VALUES ($1, $2, $3)',
+        [userId, '1.0', defaultFeatures]
+      );
+      result = await pool.query('SELECT * FROM digital_config WHERE user_id = $1', [userId]);
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '获取配置失败' });
+  }
+});
+
+// 更新功能开关
+app.post('/api/digital/config', requireAuth, async (req, res) => {
+  const userId = req.user.userId;
+  const { features } = req.body;
+  try {
+    await pool.query(
+      'UPDATE digital_config SET features = $1 WHERE user_id = $2',
+      [features, userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '更新配置失败' });
+  }
+});
+
+// 获取最新版本信息
+app.get('/api/digital/latest-version', (req, res) => {
+  // 可以从数据库动态读取，先硬编码示例
+  res.json({
+    version: '2.0',
+    release_notes: '新增语音播报功能，优化稳定性',
+    force_update: false
+  });
+});
+
+// 上报当前版本（供快捷指令调用）
+app.post('/api/digital/report-version', requireAuth, async (req, res) => {
+  const userId = req.user.userId;
+  const { version } = req.body;
+  try {
+    await pool.query(
+      'UPDATE digital_config SET current_version = $1, last_check = NOW() WHERE user_id = $2',
+      [version, userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '上报失败' });
+  }
+});
+
+// ---------- 环境变量检查 ----------
 if (!process.env.BASE_URL) {
   console.warn('⚠️ 环境变量 BASE_URL 未设置，二维码生成可能失败。请设置 BASE_URL 为你的域名。');
 }
