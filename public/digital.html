@@ -5,20 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数字系列 · LaswI Cloud</title>
     <style>
+        /* ========== 全局样式变量（与主站一致）========== */
+        :root {
+            --bg-color: #f0f2f5;
+            --container-bg: white;
+            --header-border: #e9ecef;
+            --text-primary: #1e1e1e;
+            --text-secondary: #666;
+            --text-muted: #999;
+            --border-light: #ddd;
+            --card-bg: #f8f9fa;
+            --input-bg: white;
+            --btn-primary-bg: #0066ff;
+            --btn-primary-hover: #0052cc;
+            --btn-secondary-bg: #e9ecef;
+            --btn-secondary-hover: #dee2e6;
+            --token-bg: #e9ecef;
+            --badge-bg: #e9ecef;
+            --badge-text: #495057;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --error-bg: #f8d7da;
+            --error-text: #721c24;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --container-bg: #2d2d2d;
+            --header-border: #404040;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --border-light: #404040;
+            --card-bg: #3a3a3a;
+            --input-bg: #3a3a3a;
+            --btn-primary-bg: #0066ff;
+            --btn-primary-hover: #0052cc;
+            --btn-secondary-bg: #404040;
+            --btn-secondary-hover: #505050;
+            --token-bg: #404040;
+            --badge-bg: #404040;
+            --badge-text: #b0b0b0;
+            --success-bg: #1e3a2a;
+            --success-text: #8bc34a;
+            --error-bg: #3f2a2a;
+            --error-text: #ff6b6b;
+        }
+
         body {
             font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            background: #f5f5f5;
+            background: var(--bg-color);
             margin: 0;
             padding: 20px;
-            color: #1e1e1e;
+            color: var(--text-primary);
+            transition: background 0.2s, color 0.2s;
         }
         .container {
             max-width: 600px;
             margin: 0 auto;
-            background: white;
+            background: var(--container-bg);
             border-radius: 28px;
             padding: 30px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            transition: background 0.2s;
         }
         h1 {
             font-size: 2rem;
@@ -29,24 +78,25 @@
             background-clip: text;
         }
         .subtitle {
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 30px;
             font-size: 1rem;
         }
         .card {
-            background: #f8f9fa;
+            background: var(--card-bg);
             border-radius: 20px;
             padding: 20px;
             margin-bottom: 20px;
+            transition: background 0.2s;
         }
         .card h3 {
             margin-top: 0;
             margin-bottom: 15px;
             font-size: 1.2rem;
-            color: #333;
+            color: var(--text-primary);
         }
         .token-box {
-            background: #e9ecef;
+            background: var(--token-bg);
             border-radius: 12px;
             padding: 15px;
             display: flex;
@@ -59,15 +109,15 @@
             font-family: monospace;
             word-break: break-all;
             font-size: 0.9rem;
-            color: #0066ff;
-            background: white;
+            color: var(--btn-primary-bg);
+            background: var(--input-bg);
             padding: 8px 12px;
             border-radius: 30px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-light);
             flex: 1;
         }
         .copy-btn {
-            background: #0066ff;
+            background: var(--btn-primary-bg);
             color: white;
             border: none;
             border-radius: 30px;
@@ -77,36 +127,14 @@
             transition: background 0.2s;
         }
         .copy-btn:hover {
-            background: #0052cc;
-        }
-        .version-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .badge {
-            background: #e9ecef;
-            color: #495057;
-            padding: 4px 12px;
-            border-radius: 30px;
-            font-size: 0.9rem;
-        }
-        .update-available {
-            background: #d4edda;
-            color: #155724;
-            padding: 10px 15px;
-            border-radius: 12px;
-            margin-top: 10px;
-            display: none;
+            background: var(--btn-primary-hover);
         }
         .feature-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 12px 0;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border-light);
         }
         .feature-item:last-child {
             border-bottom: none;
@@ -145,13 +173,13 @@
             border-radius: 50%;
         }
         input:checked + .slider {
-            background-color: #0066ff;
+            background-color: var(--btn-primary-bg);
         }
         input:checked + .slider:before {
             transform: translateX(26px);
         }
         .btn-save {
-            background: #0066ff;
+            background: var(--btn-primary-bg);
             color: white;
             border: none;
             border-radius: 30px;
@@ -164,7 +192,7 @@
             transition: background 0.2s;
         }
         .btn-save:hover {
-            background: #0052cc;
+            background: var(--btn-primary-hover);
         }
         .message {
             margin-top: 20px;
@@ -174,24 +202,39 @@
             text-align: center;
         }
         .success {
-            background: #d4edda;
-            color: #155724;
+            background: var(--success-bg);
+            color: var(--success-text);
             display: block;
         }
         .error {
-            background: #f8d7da;
-            color: #721c24;
+            background: var(--error-bg);
+            color: var(--error-text);
             display: block;
         }
         .note {
             font-size: 0.85rem;
-            color: #999;
+            color: var(--text-muted);
             margin-top: 20px;
             text-align: center;
+        }
+        /* 简单主题切换按钮（可选） */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--container-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 30px;
+            padding: 8px 16px;
+            cursor: pointer;
+            color: var(--text-primary);
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">🌙</button>
+
     <div class="container">
         <h1>📱 数字系列</h1>
         <div class="subtitle">管理你的快捷指令配置，所有更改自动同步到设备</div>
@@ -199,21 +242,11 @@
         <!-- API 令牌卡片 -->
         <div class="card">
             <h3>🔑 你的 API 令牌</h3>
-            <p style="color:#666; margin-bottom:10px;">在快捷指令中添加此令牌以连接 Cloud</p>
+            <p style="color:var(--text-secondary); margin-bottom:10px;">在快捷指令中添加此令牌以连接 Cloud</p>
             <div class="token-box">
                 <span id="apiToken" class="token-text">加载中...</span>
                 <button class="copy-btn" onclick="copyToken()">复制</button>
             </div>
-        </div>
-
-        <!-- 版本信息卡片 -->
-        <div class="card">
-            <h3>📦 版本信息</h3>
-            <div class="version-info">
-                <span>当前版本：<strong id="currentVersion">-</strong></span>
-                <span class="badge" id="latestVersionBadge">最新版本：-</span>
-            </div>
-            <div id="updateMessage" class="update-available"></div>
         </div>
 
         <!-- 功能开关卡片 -->
@@ -236,7 +269,20 @@
 
         let features = {};
 
-        // 加载 API 令牌
+        // ---------- 暗色模式 ----------
+        let theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        const themeBtn = document.querySelector('.theme-toggle');
+        themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+
+        window.toggleTheme = () => {
+            theme = theme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+        };
+
+        // ---------- 加载 API 令牌 ----------
         async function loadToken() {
             try {
                 const res = await fetch('/api/user/token', {
@@ -265,7 +311,7 @@
             }
         };
 
-        // 加载配置
+        // ---------- 加载配置 ----------
         async function loadConfig() {
             try {
                 const res = await fetch('/api/digital/config', {
@@ -273,7 +319,6 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    document.getElementById('currentVersion').textContent = data.current_version || '1.0';
                     features = data.features || { voice_enabled: false, notification_enabled: true };
                     renderFeatures(features);
                 } else {
@@ -307,30 +352,7 @@
             }
         }
 
-        // 加载最新版本信息
-        async function loadLatestVersion() {
-            try {
-                const res = await fetch('/api/digital/latest-version');
-                const data = await res.json();
-                if (res.ok) {
-                    document.getElementById('latestVersionBadge').textContent = `最新版本：${data.version}`;
-                    const currentVer = document.getElementById('currentVersion').textContent;
-                    if (currentVer !== '-' && data.version !== currentVer) {
-                        document.getElementById('updateMessage').innerHTML = `
-                            🚀 发现新版本 ${data.version}！<br>
-                            ${data.release_notes || ''}
-                        `;
-                        document.getElementById('updateMessage').style.display = 'block';
-                    } else {
-                        document.getElementById('updateMessage').style.display = 'none';
-                    }
-                }
-            } catch (err) {
-                console.error('加载最新版本失败');
-            }
-        }
-
-        // 保存配置
+        // ---------- 保存配置 ----------
         window.saveConfig = () => {
             const checkboxes = document.querySelectorAll('#featuresContainer input[type=checkbox]');
             const newFeatures = {};
@@ -368,7 +390,7 @@
 
         // 初始化
         loadToken();
-        loadConfig().then(() => loadLatestVersion());
+        loadConfig();
     </script>
 </body>
 </html>
