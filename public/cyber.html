@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber 系列 · LaswI Cloud</title>
+    <style>
+        /* 复制之前各产品线的样式，保持一致 */
+        :root { ... }
+        /* 省略样式，实际使用时保留与 digital/silent/pro 相同的样式 */
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    <div class="container">
+        <h1>💻 Cyber 系列</h1>
+        <div class="subtitle">Silent 的专注 + Pro 的个性，融合一体</div>
+        <div class="card">
+            <h3>🔑 你的 API 令牌</h3>
+            <div class="token-box">
+                <span id="apiToken" class="token-text">加载中...</span>
+                <button class="copy-btn" onclick="copyToken()">复制</button>
+            </div>
+        </div>
+        <div class="card">
+            <h3>⚙️ 功能开关</h3>
+            <div id="featuresContainer"></div>
+        </div>
+        <button class="btn-save" onclick="saveConfig()">保存设置</button>
+        <div id="message" class="message"></div>
+        <div class="note">* 修改后请在快捷指令中重新运行以生效</div>
+    </div>
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) { alert('请先登录'); window.location.href = '/'; }
+        let features = {};
+        let theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.querySelector('.theme-toggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+        window.toggleTheme = () => {
+            theme = theme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            document.querySelector('.theme-toggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+        };
+        async function loadToken() {
+            try {
+                const res = await fetch('/api/user/token', { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                document.getElementById('apiToken').textContent = data.token || '获取失败';
+            } catch { document.getElementById('apiToken').textContent = '网络错误'; }
+        }
+        window.copyToken = () => {
+            const text = document.getElementById('apiToken').textContent;
+            if (text && !text.includes('加载') && !text.includes('失败')) {
+                navigator.clipboard.writeText(text).then(() => alert('已复制'));
+            }
+        };
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/cyber/config', { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                if (res.ok) {
+                    features = data.features || { mute_enabled: false, block_popups: false, advanced_mode: true, custom_theme: 'dark' };
+                    renderFeatures(features);
+                } else showMessage('加载失败', 'error');
+            } catch { showMessage('网络错误', 'error'); }
+        }
+        function renderFeatures(features) {
+            const container = document.getElementById('featuresContainer');
+            container.innerHTML = '';
+            const labels = {
+                mute_enabled: '静音模式',
+                block_popups: '弹窗屏蔽',
+                advanced_mode: '高级模式',
+                custom_theme: '自定义主题'
+            };
+            for (let key in features) {
+                if (typeof features[key] === 'boolean') {
+                    container.innerHTML += `
+                        <div class="feature-item">
+                            <span>${labels[key] || key}</span>
+                            <label class="switch">
+                                <input type="checkbox" data-key="${key}" ${features[key] ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML += `
+                        <div class="feature-item">
+                            <span>${labels[key] || key}</span>
+                            <span>${features[key]}</span>
+                        </div>
+                    `;
+                }
+            }
+        }
+        window.saveConfig = () => {
+            const newFeatures = {};
+            document.querySelectorAll('#featuresContainer input[type=checkbox]').forEach(cb => {
+                newFeatures[cb.dataset.key] = cb.checked;
+            });
+            fetch('/api/cyber/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ features: newFeatures })
+            })
+            .then(res => res.json())
+            .then(data => showMessage(data.success ? '保存成功' : '保存失败', data.success ? 'success' : 'error'))
+            .catch(() => showMessage('网络错误', 'error'));
+        };
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type}`;
+            setTimeout(() => msg.className = 'message', 3000);
+        }
+        loadToken();
+        loadConfig();
+    </script>
+</body>
+</html>
