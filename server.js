@@ -139,6 +139,19 @@ const pool = new Pool({
     `);
     console.log('✅ 表 pro_config 已就绪');
 
+    // cyber_config 表（Cyber 系列，Silent + Pro 融合）
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cyber_config (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        current_version VARCHAR(20) DEFAULT '1.0',
+        features JSONB DEFAULT '{}',
+        last_check TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id)
+      );
+    `);
+    console.log('✅ 表 cyber_config 已就绪');
+
   } catch (err) {
     console.error('❌ 自动建表失败:', err);
   }
@@ -512,6 +525,47 @@ app.post('/api/pro/config', authenticateWebOrApi, async (req, res) => {
   }
 });
 
+// ---------- Cyber 系列 API ----------
+app.get('/api/cyber/config', authenticateWebOrApi, async (req, res) => {
+  const userId = req.userId;
+  try {
+    let result = await pool.query('SELECT * FROM cyber_config WHERE user_id = $1', [userId]);
+    if (result.rows.length === 0) {
+      // 默认配置：结合 Silent 的静音和 Pro 的高级模式
+      const defaultFeatures = { 
+        mute_enabled: false, 
+        block_popups: false,
+        advanced_mode: true,
+        custom_theme: 'dark' 
+      };
+      await pool.query(
+        'INSERT INTO cyber_config (user_id, current_version, features) VALUES ($1, $2, $3)',
+        [userId, '1.0', defaultFeatures]
+      );
+      result = await pool.query('SELECT * FROM cyber_config WHERE user_id = $1', [userId]);
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '获取配置失败' });
+  }
+});
+
+app.post('/api/cyber/config', authenticateWebOrApi, async (req, res) => {
+  const userId = req.userId;
+  const { features } = req.body;
+  try {
+    await pool.query(
+      'UPDATE cyber_config SET features = $1 WHERE user_id = $2',
+      [features, userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '更新配置失败' });
+  }
+});
+
 // ---------- 可选：最新版本接口（可根据需要扩展）----------
 app.get('/api/digital/latest-version', (req, res) => {
   res.json({ version: '2.0', release_notes: '新增语音播报功能' });
@@ -523,6 +577,10 @@ app.get('/api/silent/latest-version', (req, res) => {
 
 app.get('/api/pro/latest-version', (req, res) => {
   res.json({ version: '3.0', release_notes: '高级个性化选项' });
+});
+
+app.get('/api/cyber/latest-version', (req, res) => {
+  res.json({ version: '1.0', release_notes: '融合静音与个性化' });
 });
 
 // ---------- 环境变量检查 ----------
