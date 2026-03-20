@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>LaswI Maps · AI 智能导航</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            background: #e9ecef;
+        }
+        .user-info {
+            background: #f8f9fa;
+            padding: 12px 20px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #eee;
+            text-align: right;
+            color: #1e1e1e;
+        }
+        .user-info a {
+            color: #0066ff;
+            text-decoration: none;
+            margin-left: 8px;
+        }
+        .controls {
+            padding: 16px 20px;
+            display: flex;
+            gap: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        #user-input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 30px;
+            border: 1px solid #ddd;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        #user-input:focus {
+            border-color: #0066ff;
+        }
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 0 20px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        button:hover {
+            background: #0052cc;
+        }
+        .loc-status {
+            font-size: 0.8rem;
+            color: #888;
+            padding: 8px 20px;
+            background: #fafbfc;
+            border-bottom: 1px solid #eee;
+        }
+        .info {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: none;
+        }
+        .info div {
+            margin: 4px 0;
+        }
+        .steps {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            background: white;
+        }
+        .step {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            color: #333;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+        }
+        @media (max-width: 600px) {
+            .controls {
+                flex-wrap: wrap;
+            }
+            button {
+                padding: 8px 16px;
+            }
+        }
+    </style>
+    <!-- 高德地图 JavaScript API，请替换 your_amap_js_key 为你的 Web 端 Key -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=84d6da50eac70d175c8d0d9e62377c7b"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="user-info" id="userInfo">加载中...</div>
+        <div class="controls">
+            <input type="text" id="user-input" placeholder="例如：去火车站，最快路线" autofocus>
+            <button id="voice-btn">🎤 语音</button>
+            <button id="send-btn">导航</button>
+        </div>
+        <div id="loc-status" class="loc-status">正在获取您的位置...</div>
+        <div class="info" id="info">
+            <div>目的地：<span id="dest"></span></div>
+            <div>距离：<span id="dist"></span>  时间：<span id="time"></span></div>
+        </div>
+        <div id="steps" class="steps">
+            <div class="loading">点击「导航」或使用语音输入</div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 1. 读取主站登录状态 ==========
+        const token = localStorage.getItem('token');
+        let user = null;
+        const userInfoDiv = document.getElementById('userInfo');
+        if (token) {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                user = { id: payload.userId, username: payload.username };
+                userInfoDiv.innerHTML = `👤 ${user.username} | <a href="https://laswi-ai-production.up.railway.app" target="_blank">返回主站</a>`;
+            } catch (e) {
+                userInfoDiv.innerHTML = `未登录 | <a href="https://laswi-ai-production.up.railway.app" target="_blank">去登录</a>`;
+            }
+        } else {
+            userInfoDiv.innerHTML = `未登录 | <a href="https://laswi-ai-production.up.railway.app" target="_blank">去登录</a>`;
+        }
+
+        // ========== 2. 地图相关变量 ==========
+        let map = null;
+        let polyline = null;
+        let userLocation = null;          // 当前用户经纬度 { lng, lat }
+        let locationReady = false;
+
+        // ========== 3. 获取用户地理位置 ==========
+        function getUserLocation() {
+            if (!navigator.geolocation) {
+                document.getElementById('loc-status').innerText = '您的浏览器不支持定位';
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    userLocation = {
+                        lng: pos.coords.longitude,
+                        lat: pos.coords.latitude
+                    };
+                    locationReady = true;
+                    document.getElementById('loc-status').innerHTML = `📍 当前定位：${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`;
+                    // 移动地图中心到用户位置
+                    if (map) {
+                        map.setCenter([userLocation.lng, userLocation.lat]);
+                        map.setZoom(14);
+                    }
+                },
+                (err) => {
+                    console.error('定位失败:', err);
+                    document.getElementById('loc-status').innerHTML = '⚠️ 无法获取您的位置，将使用默认起点（北京天安门）';
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        // ========== 4. 初始化高德地图 ==========
+        function initMap() {
+            map = new AMap.Map('map', {
+                zoom: 12,
+                center: [116.397428, 39.90923],   // 默认天安门
+                viewMode: '2D'
+            });
+        }
+
+        // ========== 5. 绘制路线 ==========
+        function drawRoute(polylineStr) {
+            // 高德 polyline 格式 "lng1,lat1;lng2,lat2;..."
+            const path = polylineStr.split(';').map(p => {
+                const [lng, lat] = p.split(',');
+                return [parseFloat(lng), parseFloat(lat)];
+            });
+            if (polyline) map.remove(polyline);
+            polyline = new AMap.Polyline({
+                path: path,
+                strokeColor: "#0066ff",
+                strokeWeight: 6,
+                strokeOpacity: 0.8,
+                strokeStyle: "solid"
+            });
+            polyline.setMap(map);
+            map.setFitView([polyline], false, { padding: { top: 30, right: 30, bottom: 30, left: 30 } });
+        }
+
+        // ========== 6. 显示步骤 ==========
+        function showSteps(steps) {
+            const stepsDiv = document.getElementById('steps');
+            if (!steps || steps.length === 0) {
+                stepsDiv.innerHTML = '<div class="loading">未获取到路线指引</div>';
+                return;
+            }
+            stepsDiv.innerHTML = steps.map(step => `<div class="step">${step}</div>`).join('');
+        }
+
+        function showError(msg) {
+            const stepsDiv = document.getElementById('steps');
+            stepsDiv.innerHTML = `<div class="loading error">❌ ${msg}</div>`;
+            document.getElementById('info').style.display = 'none';
+        }
+
+        // ========== 7. 发送导航请求 ==========
+        async function navigate(query) {
+            if (!query.trim()) return;
+            const stepsDiv = document.getElementById('steps');
+            stepsDiv.innerHTML = '<div class="loading">正在规划路线...</div>';
+            document.getElementById('info').style.display = 'none';
+
+            // 构建请求体
+            const body = { query };
+            if (userLocation) {
+                body.origin = `${userLocation.lng},${userLocation.lat}`;  // 高德格式 lng,lat
+            }
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            try {
+                const response = await fetch('/api/maps/navigate', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('dest').innerText = data.destination;
+                    document.getElementById('dist').innerText = data.distance;
+                    document.getElementById('time').innerText = data.duration;
+                    document.getElementById('info').style.display = 'block';
+                    showSteps(data.steps);
+                    drawRoute(data.polyline);
+                } else {
+                    showError(data.error || '导航失败');
+                }
+            } catch (err) {
+                console.error(err);
+                showError('网络错误，请稍后重试');
+            }
+        }
+
+        // ========== 8. 语音输入 ==========
+        let recognition = null;
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.lang = 'zh-CN';
+            recognition.interimResults = false;
+            recognition.onresult = (e) => {
+                const text = e.results[0][0].transcript;
+                document.getElementById('user-input').value = text;
+                navigate(text);
+            };
+            recognition.onerror = (e) => {
+                console.error(e);
+                alert('语音识别失败，请重试');
+            };
+        } else {
+            // 不支持语音识别的浏览器，隐藏语音按钮
+            const voiceBtn = document.getElementById('voice-btn');
+            if (voiceBtn) voiceBtn.style.display = 'none';
+        }
+
+        // ========== 9. 事件绑定 ==========
+        document.getElementById('send-btn').onclick = () => {
+            const text = document.getElementById('user-input').value;
+            navigate(text);
+        };
+        if (recognition) {
+            document.getElementById('voice-btn').onclick = () => recognition.start();
+        }
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                navigate(e.target.value);
+            }
+        });
+
+        // ========== 10. 启动 ==========
+        initMap();
+        getUserLocation();
+    </script>
+</body>
+</html>
