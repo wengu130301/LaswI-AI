@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -131,6 +132,20 @@ const pool = new Pool({
       );
     `);
     console.log('✅ 表 translation_history 已就绪');
+
+    // 备忘录
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS memos (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        ai_summary TEXT,
+        due_date TIMESTAMP,
+        tags TEXT[],
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✅ 表 memos 已就绪');
 
   } catch (err) {
     console.error('❌ 自动建表失败:', err);
@@ -331,36 +346,56 @@ app.get('/api/user/token', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 产品线 API（digital 示例，其他类似）----------
-app.get('/api/digital/config', authenticateWebOrApi, async (req, res) => {
-  const userId = req.userId;
-  try {
-    let result = await pool.query('SELECT * FROM digital_config WHERE user_id = $1', [userId]);
-    if (result.rows.length === 0) {
-      await pool.query(
-        'INSERT INTO digital_config (user_id, current_version, features) VALUES ($1, $2, $3)',
-        [userId, '1.0', { voice_enabled: false, notification_enabled: true }]
-      );
-      result = await pool.query('SELECT * FROM digital_config WHERE user_id = $1', [userId]);
+// ---------- 产品线配置（digital, silent, pro, cyber）----------
+const productConfigs = {
+  digital: { defaultFeatures: { voice_enabled: false, notification_enabled: true } },
+  silent: { defaultFeatures: { mute_enabled: false, block_popups: false } },
+  pro: { defaultFeatures: { advanced_mode: true, custom_theme: 'light' } },
+  cyber: { defaultFeatures: { mute_enabled: false, block_popups: false, advanced_mode: true, custom_theme: 'dark' } }
+};
+
+for (const [product, config] of Object.entries(productConfigs)) {
+  app.get(`/api/${product}/config`, authenticateWebOrApi, async (req, res) => {
+    const userId = req.userId;
+    try {
+      let result = await pool.query(`SELECT * FROM ${product}_config WHERE user_id = $1`, [userId]);
+      if (result.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO ${product}_config (user_id, current_version, features) VALUES ($1, $2, $3)`,
+          [userId, '1.0', config.defaultFeatures]
+        );
+        result = await pool.query(`SELECT * FROM ${product}_config WHERE user_id = $1`, [userId]);
+      }
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: '获取配置失败' });
     }
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: '获取配置失败' });
-  }
-});
-app.post('/api/digital/config', authenticateWebOrApi, async (req, res) => {
-  const userId = req.userId;
-  const { features } = req.body;
-  try {
-    await pool.query('UPDATE digital_config SET features = $1 WHERE user_id = $2', [features, userId]);
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: '更新配置失败' });
-  }
-});
-// silent, pro, cyber 路由类似，可参考之前版本，此处省略以节省篇幅，实际使用时需添加。
+  });
+
+  app.post(`/api/${product}/config`, authenticateWebOrApi, async (req, res) => {
+    const userId = req.userId;
+    const { features } = req.body;
+    try {
+      await pool.query(`UPDATE ${product}_config SET features = $1 WHERE user_id = $2`, [features, userId]);
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: '更新配置失败' });
+    }
+  });
+
+  // 最新版本接口（可选）
+  app.get(`/api/${product}/latest-version`, (req, res) => {
+    const versions = {
+      digital: { version: '2.0', release_notes: '新增语音播报功能' },
+      silent: { version: '1.5', release_notes: '优化静音逻辑' },
+      pro: { version: '3.0', release_notes: '高级个性化选项' },
+      cyber: { version: '1.0', release_notes: '融合静音与个性化' }
+    };
+    res.json(versions[product] || { version: '1.0', release_notes: '' });
+  });
+}
 
 // ---------- 地图导航 ----------
 const AMAP_KEY = process.env.AMAP_KEY;
@@ -584,6 +619,96 @@ app.get('/api/translate/history', requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '获取历史失败' });
+  }
+});
+
+// ---------- 备忘录 ----------
+app.post('/api/memo', requireAuth, async (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: '内容不能为空' });
+
+  const prompt = `请分析以下备忘录内容，提取关键信息，返回 JSON 格式：
+  {
+    "summary": "一句话总结",
+    "due_date": "提取的日期时间（ISO格式），如果没有则 null",
+    "tags": ["标签1","标签2"]
+  }
+  内容：${content}`;
+  try {
+    const response = await client.ChatCompletions({
+      Model: 'hunyuan-lite',
+      Messages: [{ Role: 'user', Content: prompt }],
+    });
+    const aiResult = JSON.parse(response.Choices[0].Message.Content);
+    const dueDate = aiResult.due_date ? new Date(aiResult.due_date) : null;
+    const tags = aiResult.tags || [];
+
+    const result = await pool.query(
+      `INSERT INTO memos (user_id, content, ai_summary, due_date, tags)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+      [req.user.userId, content, aiResult.summary, dueDate, tags]
+    );
+    res.json({
+      success: true,
+      memo: { id: result.rows[0].id, content, summary: aiResult.summary, due_date: dueDate, tags, created_at: result.rows[0].created_at }
+    });
+  } catch (err) {
+    console.error('AI 解析失败，直接保存原内容', err);
+    const result = await pool.query(
+      `INSERT INTO memos (user_id, content) VALUES ($1, $2) RETURNING id, created_at`,
+      [req.user.userId, content]
+    );
+    res.json({ success: true, memo: { id: result.rows[0].id, content, summary: null, due_date: null, tags: [], created_at: result.rows[0].created_at } });
+  }
+});
+
+app.get('/api/memo', requireAuth, async (req, res) => {
+  const { limit = 20, offset = 0 } = req.query;
+  try {
+    const result = await pool.query(
+      `SELECT id, content, ai_summary, due_date, tags, created_at
+       FROM memos
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [req.user.userId, limit, offset]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '获取备忘录失败' });
+  }
+});
+
+app.delete('/api/memo/:id', requireAuth, async (req, res) => {
+  const memoId = parseInt(req.params.id);
+  try {
+    const result = await pool.query(
+      'DELETE FROM memos WHERE id = $1 AND user_id = $2 RETURNING id',
+      [memoId, req.user.userId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: '未找到或无权删除' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '删除失败' });
+  }
+});
+
+app.put('/api/memo/:id', requireAuth, async (req, res) => {
+  const memoId = parseInt(req.params.id);
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: '内容不能为空' });
+  try {
+    const result = await pool.query(
+      'UPDATE memos SET content = $1 WHERE id = $2 AND user_id = $3 RETURNING id',
+      [content, memoId, req.user.userId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: '未找到或无权修改' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '更新失败' });
   }
 });
 

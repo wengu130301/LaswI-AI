@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 备忘录 · LaswI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        header {
+            padding: 24px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #0066ff, #5f9eff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .user-status {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 8px;
+        }
+        .input-area {
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 1rem;
+            resize: vertical;
+            outline: none;
+            transition: border 0.2s;
+        }
+        textarea:focus {
+            border-color: #0066ff;
+        }
+        button {
+            margin-top: 12px;
+            background: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0052cc;
+        }
+        .memo-list {
+            padding: 20px;
+            background: #fafbfc;
+        }
+        .memo-item {
+            background: white;
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s;
+        }
+        .memo-item:hover {
+            border-color: #0066ff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .memo-content {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        .memo-meta {
+            font-size: 0.8rem;
+            color: #888;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .tag {
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+        .due {
+            color: #0066ff;
+        }
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            margin-left: auto;
+        }
+        .delete-btn:hover {
+            background: #f8d7da;
+            border-radius: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e9ecef;
+            font-size: 0.8rem;
+            color: #999;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 AI 备忘录</h1>
+            <p class="user-status" id="userStatus">正在检查登录状态...</p>
+        </header>
+        <div class="input-area">
+            <textarea id="memoInput" rows="3" placeholder="写点什么... 例如：明天下午3点开会 / 记得买牛奶"></textarea>
+            <button id="saveBtn">保存并 AI 分析</button>
+        </div>
+        <div class="memo-list">
+            <div id="memoList" class="loading">加载中...</div>
+        </div>
+        <div class="footer">
+            LaswI AI 智能备忘 · 自动提取时间和标签
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const userStatus = document.getElementById('userStatus');
+
+        if (!token) {
+            userStatus.innerHTML = '🔓 未登录 · 请先<a href="/">登录</a>使用';
+            document.getElementById('saveBtn').disabled = true;
+            document.getElementById('memoInput').disabled = true;
+        } else {
+            userStatus.innerHTML = '👤 已登录，AI 帮你智能备忘';
+            loadMemos();
+        }
+
+        // 加载备忘录列表
+        async function loadMemos() {
+            const container = document.getElementById('memoList');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            try {
+                const res = await fetch('/api/memo', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const memos = await res.json();
+                if (memos.length === 0) {
+                    container.innerHTML = '<div class="loading">暂无备忘录，开始记录吧</div>';
+                    return;
+                }
+                container.innerHTML = memos.map(memo => `
+                    <div class="memo-item" data-id="${memo.id}">
+                        <div class="memo-content">${escapeHtml(memo.content)}</div>
+                        ${memo.ai_summary ? `<div class="memo-meta"><span>📌 ${escapeHtml(memo.ai_summary)}</span></div>` : ''}
+                        <div class="memo-meta">
+                            ${memo.tags && memo.tags.length ? memo.tags.map(tag => `<span class="tag">#${escapeHtml(tag)}</span>`).join('') : ''}
+                            ${memo.due_date ? `<span class="due">⏰ ${new Date(memo.due_date).toLocaleString()}</span>` : ''}
+                            <span>📅 ${new Date(memo.created_at).toLocaleString()}</span>
+                            <button class="delete-btn" onclick="deleteMemo(${memo.id})">删除</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<div class="error">加载失败，请刷新重试</div>';
+                console.error(err);
+            }
+        }
+
+        // 保存新备忘录
+        document.getElementById('saveBtn').addEventListener('click', async () => {
+            const content = document.getElementById('memoInput').value.trim();
+            if (!content) return;
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            btn.textContent = 'AI 分析中...';
+            try {
+                const res = await fetch('/api/memo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ content })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('memoInput').value = '';
+                    loadMemos();
+                } else {
+                    alert('保存失败：' + (data.error || '未知错误'));
+                }
+            } catch (err) {
+                alert('网络错误，请稍后再试');
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '保存并 AI 分析';
+            }
+        });
+
+        // 删除备忘录
+        window.deleteMemo = async (id) => {
+            if (!confirm('确定删除这条备忘录吗？')) return;
+            try {
+                const res = await fetch(`/api/memo/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    loadMemos();
+                } else {
+                    alert('删除失败');
+                }
+            } catch (err) {
+                alert('网络错误');
+            }
+        };
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+    </script>
+</body>
+</html>
