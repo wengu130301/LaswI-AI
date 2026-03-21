@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 翻译 · LaswI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        header {
+            padding: 24px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #0066ff, #5f9eff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .user-status {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 8px;
+        }
+        .input-area {
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 1rem;
+            resize: vertical;
+            outline: none;
+            transition: border 0.2s;
+        }
+        textarea:focus {
+            border-color: #0066ff;
+        }
+        .lang-select {
+            display: flex;
+            gap: 12px;
+            margin: 16px 0;
+            align-items: center;
+        }
+        select, button {
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid #ddd;
+            background: white;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0052cc;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 20px;
+            margin-top: 20px;
+            border: 1px solid #e9ecef;
+            min-height: 100px;
+        }
+        .result-label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .result-text {
+            font-size: 1rem;
+            line-height: 1.5;
+            color: #1e1e1e;
+        }
+        .history-section {
+            border-top: 1px solid #e9ecef;
+            padding: 20px;
+            background: white;
+        }
+        .history-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        .history-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .history-item:hover {
+            background: #f8f9fa;
+        }
+        .history-original {
+            font-weight: 500;
+            color: #0066ff;
+        }
+        .history-translated {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 4px;
+        }
+        .history-time {
+            font-size: 0.7rem;
+            color: #999;
+            margin-top: 4px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e9ecef;
+            font-size: 0.8rem;
+            color: #999;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛠️ AI 翻译</h1>
+            <p class="user-status" id="userStatus">正在检查登录状态...</p>
+        </header>
+        <div class="input-area">
+            <textarea id="sourceText" rows="4" placeholder="输入要翻译的文本..."></textarea>
+            <div class="lang-select">
+                <span>翻译为：</span>
+                <select id="targetLang">
+                    <option value="zh">中文</option>
+                    <option value="en" selected>英文</option>
+                    <option value="ja">日文</option>
+                    <option value="ko">韩文</option>
+                    <option value="fr">法文</option>
+                    <option value="de">德文</option>
+                    <option value="es">西班牙文</option>
+                    <option value="ru">俄文</option>
+                </select>
+                <button id="translateBtn">翻译</button>
+            </div>
+            <div id="resultArea" class="result" style="display: none;">
+                <div class="result-label">翻译结果</div>
+                <div class="result-text" id="translatedText"></div>
+            </div>
+        </div>
+        <div class="history-section" id="historySection" style="display: none;">
+            <div class="history-title">📜 翻译历史</div>
+            <div id="historyList"></div>
+        </div>
+        <div class="footer">
+            LaswI AI 翻译 · 由腾讯混元驱动
+        </div>
+    </div>
+
+    <script>
+        // 从主站 localStorage 读取 token
+        const token = localStorage.getItem('token');
+        let userId = null;
+
+        function getUserInfo() {
+            if (!token) return null;
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return payload;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        const user = getUserInfo();
+        const userStatus = document.getElementById('userStatus');
+        if (user) {
+            userStatus.innerHTML = `👤 已登录：${user.username} · 翻译记录将自动保存`;
+        } else {
+            userStatus.innerHTML = `🔓 未登录 · 翻译记录不会保存 <a href="/" style="color:#0066ff;">去登录</a>`;
+        }
+
+        // 加载历史记录
+        async function loadHistory() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/translate/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const history = await res.json();
+                    const historyList = document.getElementById('historyList');
+                    if (history.length === 0) {
+                        document.getElementById('historySection').style.display = 'none';
+                        return;
+                    }
+                    historyList.innerHTML = history.map(item => `
+                        <div class="history-item" onclick="fillTranslation('${escapeHtml(item.source_text)}', '${escapeHtml(item.translated_text)}', '${item.target_lang}')">
+                            <div class="history-original">🔍 ${escapeHtml(item.source_text)}</div>
+                            <div class="history-translated">→ ${escapeHtml(item.translated_text)}</div>
+                            <div class="history-time">${new Date(item.created_at).toLocaleString()}</div>
+                        </div>
+                    `).join('');
+                    document.getElementById('historySection').style.display = 'block';
+                }
+            } catch (err) {
+                console.error('加载历史失败', err);
+            }
+        }
+
+        window.fillTranslation = function(source, translated, lang) {
+            document.getElementById('sourceText').value = source;
+            document.getElementById('targetLang').value = lang;
+            document.getElementById('translatedText').innerText = translated;
+            document.getElementById('resultArea').style.display = 'block';
+        };
+
+        async function translate() {
+            const text = document.getElementById('sourceText').value.trim();
+            const targetLang = document.getElementById('targetLang').value;
+            if (!text) {
+                alert('请输入要翻译的文本');
+                return;
+            }
+
+            const resultDiv = document.getElementById('resultArea');
+            const translatedSpan = document.getElementById('translatedText');
+            resultDiv.style.display = 'block';
+            translatedSpan.innerHTML = '<div class="loading">🤖 翻译中...</div>';
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            try {
+                const res = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ text, targetLang })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    translatedSpan.innerText = data.translated;
+                    if (token) loadHistory(); // 刷新历史
+                } else {
+                    translatedSpan.innerHTML = `<span class="error">${data.error || '翻译失败'}</span>`;
+                }
+            } catch (err) {
+                translatedSpan.innerHTML = `<span class="error">网络错误，请稍后再试</span>`;
+                console.error(err);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        document.getElementById('translateBtn').addEventListener('click', translate);
+        document.getElementById('sourceText').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) translate();
+        });
+
+        // 加载历史
+        if (token) loadHistory();
+    </script>
+</body>
+</html>

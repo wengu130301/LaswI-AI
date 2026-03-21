@@ -19,6 +19,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 根路由
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -32,7 +33,6 @@ const pool = new Pool({
 // ---------- 自动建表 ----------
 (async () => {
   try {
-    // users 表
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -43,7 +43,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 users 已就绪');
 
-    // 添加字段（如果不存在）
     try {
       await pool.query(`ALTER TABLE users ADD COLUMN current_session VARCHAR(255);`);
       console.log('✅ 字段 current_session 已添加到 users');
@@ -53,7 +52,6 @@ const pool = new Pool({
       console.log('✅ 字段 api_token 已添加到 users');
     } catch (err) { if (!err.message.includes('already exists')) console.error(err); }
 
-    // conversations
     await pool.query(`
       CREATE TABLE IF NOT EXISTS conversations (
         id SERIAL PRIMARY KEY,
@@ -65,7 +63,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 conversations 已就绪');
 
-    // scan_codes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS scan_codes (
         id SERIAL PRIMARY KEY,
@@ -121,6 +118,19 @@ const pool = new Pool({
       );
     `);
     console.log('✅ 表 browser_history 已就绪');
+
+    // 翻译历史
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS translation_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        source_text TEXT NOT NULL,
+        target_lang VARCHAR(20) NOT NULL,
+        translated_text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✅ 表 translation_history 已就绪');
 
   } catch (err) {
     console.error('❌ 自动建表失败:', err);
@@ -321,7 +331,7 @@ app.get('/api/user/token', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 产品线 API（简化，仅列出 digital 和 silent 作为示例，其他类似）----------
+// ---------- 产品线 API（digital 示例，其他类似）----------
 app.get('/api/digital/config', authenticateWebOrApi, async (req, res) => {
   const userId = req.userId;
   try {
@@ -350,7 +360,7 @@ app.post('/api/digital/config', authenticateWebOrApi, async (req, res) => {
     res.status(500).json({ error: '更新配置失败' });
   }
 });
-// silent, pro, cyber 类似，此处省略重复代码（实际可参考之前版本）
+// silent, pro, cyber 路由类似，可参考之前版本，此处省略以节省篇幅，实际使用时需添加。
 
 // ---------- 地图导航 ----------
 const AMAP_KEY = process.env.AMAP_KEY;
@@ -467,7 +477,7 @@ app.post('/api/browser/search', async (req, res) => {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, JWT_SECRET);
       userId = decoded.userId;
-    } catch (err) { /* token无效 */ }
+    } catch (err) { /* 忽略 */ }
   }
 
   const prompt = `你是一个智能网址导航助手。根据用户输入，返回对应的官方网站链接。输出必须为JSON数组，每个元素包含 name 和 url 字段。如果用户指定了国家/地区，请返回该国对应的官方域名。例如：
@@ -509,12 +519,65 @@ app.post('/api/browser/search', async (req, res) => {
     res.status(500).json({ error: '无法解析，请稍后再试' });
   }
 });
-
-// 获取当前用户的浏览器搜索历史（需登录）
 app.get('/api/browser/history', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT query, results, created_at FROM browser_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20',
+      [req.user.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '获取历史失败' });
+  }
+});
+
+// ---------- 翻译 ----------
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLang } = req.body;
+  if (!text || !targetLang) return res.status(400).json({ error: '缺少原文或目标语言' });
+
+  let userId = null;
+  const authHeader = req.headers['authorization'];
+  if (authHeader) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      userId = decoded.userId;
+    } catch (err) { /* 忽略 */ }
+  }
+
+  const langNames = {
+    zh: '中文', en: '英文', ja: '日文', ko: '韩文',
+    fr: '法文', de: '德文', es: '西班牙文', ru: '俄文'
+  };
+  const targetLangName = langNames[targetLang] || targetLang;
+
+  const prompt = `请将以下文本翻译成${targetLangName}。只返回翻译结果，不要添加任何额外说明。原文：${text}`;
+  try {
+    const response = await client.ChatCompletions({
+      Model: 'hunyuan-lite',
+      Messages: [{ Role: 'user', Content: prompt }],
+    });
+    const translated = response.Choices[0].Message.Content.trim();
+
+    if (userId) {
+      await pool.query(
+        'INSERT INTO translation_history (user_id, source_text, target_lang, translated_text) VALUES ($1, $2, $3, $4)',
+        [userId, text, targetLang, translated]
+      );
+    }
+
+    res.json({ success: true, translated });
+  } catch (err) {
+    console.error('翻译失败:', err);
+    res.status(500).json({ error: '翻译服务异常' });
+  }
+});
+app.get('/api/translate/history', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, source_text, target_lang, translated_text, created_at FROM translation_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20',
       [req.user.userId]
     );
     res.json(result.rows);
