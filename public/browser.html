@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 浏览器 · LaswI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        header {
+            padding: 24px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #0066ff, #5f9eff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .user-status {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 8px;
+        }
+        .input-area {
+            padding: 20px;
+            display: flex;
+            gap: 12px;
+        }
+        input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+        input:focus {
+            border-color: #0066ff;
+        }
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 0 28px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0052cc;
+        }
+        .results {
+            padding: 20px;
+            background: #fafbfc;
+            min-height: 200px;
+        }
+        .result-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            border: 1px solid #e9ecef;
+            transition: all 0.2s;
+        }
+        .result-item:hover {
+            border-color: #0066ff;
+            transform: translateY(-2px);
+        }
+        .result-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 6px;
+            color: #1e1e1e;
+        }
+        .result-url {
+            color: #0066ff;
+            font-size: 0.9rem;
+            word-break: break-all;
+            text-decoration: none;
+        }
+        .result-url:hover {
+            text-decoration: underline;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+            text-align: center;
+            padding: 20px;
+        }
+        .history-section {
+            border-top: 1px solid #e9ecef;
+            padding: 20px;
+            background: white;
+        }
+        .history-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        .history-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .history-item:hover {
+            background: #f8f9fa;
+        }
+        .history-query {
+            font-weight: 500;
+            color: #0066ff;
+        }
+        .history-time {
+            font-size: 0.7rem;
+            color: #999;
+            margin-top: 4px;
+        }
+        .footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e9ecef;
+            font-size: 0.8rem;
+            color: #999;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌐 AI 浏览器</h1>
+            <p class="user-status" id="userStatus">正在检查登录状态...</p>
+        </header>
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="例如：我想去百度 / 中国的苹果官网 / 韩国的苹果" autofocus>
+            <button id="searchBtn">🔍 搜索</button>
+        </div>
+        <div id="results" class="results">
+            <div class="loading">💡 试试输入「我想去苹果中国官网」</div>
+        </div>
+        <div class="history-section" id="historySection" style="display: none;">
+            <div class="history-title">📜 最近搜索</div>
+            <div id="historyList"></div>
+        </div>
+        <div class="footer">
+            LaswI AI 智能导航 · 由腾讯混元驱动
+        </div>
+    </div>
+
+    <script>
+        // 从主站 localStorage 读取 token
+        const token = localStorage.getItem('token');
+        let userId = null;
+
+        // 解析 token 获取用户名（仅用于显示）
+        function getUserInfo() {
+            if (!token) return null;
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return payload;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        const user = getUserInfo();
+        const userStatus = document.getElementById('userStatus');
+        if (user) {
+            userStatus.innerHTML = `👤 已登录：${user.username} · 搜索记录将自动保存`;
+        } else {
+            userStatus.innerHTML = `🔓 未登录 · 搜索记录不会保存 <a href="/" style="color:#0066ff;">去登录</a>`;
+        }
+
+        // 加载历史记录（仅当已登录）
+        async function loadHistory() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/browser/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const history = await res.json();
+                    const historyList = document.getElementById('historyList');
+                    if (history.length === 0) {
+                        document.getElementById('historySection').style.display = 'none';
+                        return;
+                    }
+                    historyList.innerHTML = history.map(item => `
+                        <div class="history-item" onclick="reSearch('${escapeHtml(item.query)}')">
+                            <div class="history-query">🔍 ${escapeHtml(item.query)}</div>
+                            <div class="history-time">${new Date(item.created_at).toLocaleString()}</div>
+                        </div>
+                    `).join('');
+                    document.getElementById('historySection').style.display = 'block';
+                }
+            } catch (err) {
+                console.error('加载历史失败', err);
+            }
+        }
+
+        window.reSearch = function(query) {
+            document.getElementById('userInput').value = query;
+            search();
+        };
+
+        async function search() {
+            const query = document.getElementById('userInput').value.trim();
+            if (!query) return;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">🤖 AI 正在分析...</div>';
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            try {
+                const res = await fetch('/api/browser/search', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ query })
+                });
+                const data = await res.json();
+                if (data.success && data.results.length) {
+                    resultsDiv.innerHTML = data.results.map(item => `
+                        <div class="result-item">
+                            <div class="result-name">${escapeHtml(item.name)}</div>
+                            <a href="${escapeHtml(item.url)}" target="_blank" class="result-url">${escapeHtml(item.url)}</a>
+                        </div>
+                    `).join('');
+                    // 如果已登录，刷新历史（新记录可能已添加）
+                    if (token) loadHistory();
+                } else {
+                    resultsDiv.innerHTML = `<div class="error">😵 未找到相关网站，请换个说法试试</div>`;
+                }
+            } catch (err) {
+                resultsDiv.innerHTML = `<div class="error">❌ 网络错误，请稍后再试</div>`;
+                console.error(err);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', search);
+        document.getElementById('userInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') search();
+        });
+
+        // 加载历史
+        if (token) loadHistory();
+    </script>
+</body>
+</html>
