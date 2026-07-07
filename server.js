@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -10,10 +9,6 @@ const { Pool } = require('pg');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
 const axios = require('axios');
-
-// 腾讯混元SDK
-const tencentcloud = require('tencentcloud-sdk-nodejs-hunyuan');
-const HunyuanClient = tencentcloud.hunyuan.v20230901.Client;
 
 const app = express();
 app.use(cors());
@@ -77,7 +72,6 @@ const pool = new Pool({
     console.log('✅ 表 scan_codes 已就绪');
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_scan_codes_code ON scan_codes(code);`);
 
-    // 产品线配置表
     const productTables = ['digital_config', 'silent_config', 'pro_config', 'cyber_config'];
     for (const table of productTables) {
       await pool.query(`
@@ -93,7 +87,6 @@ const pool = new Pool({
       console.log(`✅ 表 ${table} 已就绪`);
     }
 
-    // 地图导航历史
     await pool.query(`
       CREATE TABLE IF NOT EXISTS navigation_history (
         id SERIAL PRIMARY KEY,
@@ -108,7 +101,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 navigation_history 已就绪');
 
-    // 浏览器搜索历史
     await pool.query(`
       CREATE TABLE IF NOT EXISTS browser_history (
         id SERIAL PRIMARY KEY,
@@ -120,7 +112,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 browser_history 已就绪');
 
-    // 翻译历史
     await pool.query(`
       CREATE TABLE IF NOT EXISTS translation_history (
         id SERIAL PRIMARY KEY,
@@ -133,7 +124,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 translation_history 已就绪');
 
-    // 备忘录
     await pool.query(`
       CREATE TABLE IF NOT EXISTS memos (
         id SERIAL PRIMARY KEY,
@@ -153,17 +143,32 @@ const pool = new Pool({
 })();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-// 腾讯混元客户端
-const clientConfig = {
-  credential: {
-    secretId: process.env.TENCENT_SECRET_ID,
-    secretKey: process.env.TENCENT_SECRET_KEY,
-  },
-  region: 'ap-guangzhou',
-  profile: { httpProfile: { endpoint: 'hunyuan.tencentcloudapi.com' } },
-};
-const client = new HunyuanClient(clientConfig);
+// ---------- 辅助函数：统一调用 OpenAI ----------
+async function callOpenAI(messages, model = OPENAI_MODEL) {
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: model,
+        messages: messages,
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    return response.data.choices[0].message.content;
+  } catch (error) {
+    console.error('OpenAI API 错误:', error.response?.data || error.message);
+    throw new Error('OpenAI 调用失败');
+  }
+}
 
 // ---------- 辅助函数 ----------
 const getUserFromToken = async (req) => {
@@ -253,12 +258,12 @@ app.post('/api/chat', async (req, res) => {
   const user = await getUserFromToken(req);
   if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: '消息格式错误' });
   try {
-    const convertedMessages = messages.map(msg => ({ Role: msg.role, Content: msg.content }));
-    const response = await client.ChatCompletions({
-      Model: process.env.MODEL || 'hunyuan-pro',
-      Messages: convertedMessages,
-    });
-    const reply = response.Choices?.[0]?.Message?.Content;
+    // OpenAI 要求 role 使用小写
+    const convertedMessages = messages.map(msg => ({
+      role: msg.role === 'system' ? 'system' : msg.role,
+      content: msg.content
+    }));
+    const reply = await callOpenAI(convertedMessages);
     if (!reply) throw new Error('API返回内容为空');
     if (user) {
       const userMsg = messages[messages.length - 1];
@@ -269,7 +274,7 @@ app.post('/api/chat', async (req, res) => {
     }
     res.json({ reply });
   } catch (error) {
-    console.error('混元API错误:', error);
+    console.error('OpenAI API错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
@@ -346,7 +351,7 @@ app.get('/api/user/token', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 产品线配置（digital, silent, pro, cyber）----------
+// ---------- 产品线配置 ----------
 const productConfigs = {
   digital: { defaultFeatures: { voice_enabled: false, notification_enabled: true } },
   silent: { defaultFeatures: { mute_enabled: false, block_popups: false } },
@@ -385,7 +390,6 @@ for (const [product, config] of Object.entries(productConfigs)) {
     }
   });
 
-  // 最新版本接口（可选）
   app.get(`/api/${product}/latest-version`, (req, res) => {
     const versions = {
       digital: { version: '2.0', release_notes: '新增语音播报功能' },
@@ -406,19 +410,20 @@ function isCoordinate(str) {
   const lng = parseFloat(parts[0]), lat = parseFloat(parts[1]);
   return !isNaN(lng) && !isNaN(lat) && lng >= 73 && lng <= 135 && lat >= 18 && lat <= 54;
 }
+
 async function parseUserInput(userText) {
   const prompt = `请从以下用户输入中提取目的地和偏好，只返回JSON格式，如 {"destination":"火车站","preference":"最快路线"}。如果无法提取，destination 设为 null。输入：${userText}`;
-  const response = await client.ChatCompletions({
-    Model: 'hunyuan-lite',
-    Messages: [{ Role: 'user', Content: prompt }],
-  });
-  const content = response.Choices[0].Message.Content;
+  const response = await callOpenAI([
+    { role: 'system', content: '你是一个智能解析助手，只返回JSON。' },
+    { role: 'user', content: prompt }
+  ]);
   try {
-    return JSON.parse(content);
+    return JSON.parse(response);
   } catch (err) {
     return { destination: null, preference: '推荐路线' };
   }
 }
+
 async function planRoute(from, to, preference) {
   const geocodeUrl = 'https://restapi.amap.com/v3/geocode/geo';
   const geocodeRes = await axios.get(geocodeUrl, { params: { address: to, key: AMAP_KEY, output: 'JSON' } });
@@ -454,6 +459,7 @@ async function planRoute(from, to, preference) {
     raw_duration: duration
   };
 }
+
 app.post('/api/maps/navigate', async (req, res) => {
   const { query, origin } = req.body;
   if (!query) return res.status(400).json({ error: '缺少目的地描述' });
@@ -484,6 +490,7 @@ app.post('/api/maps/navigate', async (req, res) => {
     res.status(500).json({ error: err.message || '导航服务异常' });
   }
 });
+
 app.get('/api/maps/history', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -526,11 +533,10 @@ app.post('/api/browser/search', async (req, res) => {
 只输出JSON数组，不要其他文字。`;
 
   try {
-    const response = await client.ChatCompletions({
-      Model: 'hunyuan-lite',
-      Messages: [{ Role: 'user', Content: prompt }],
-    });
-    const content = response.Choices[0].Message.Content;
+    const content = await callOpenAI([
+      { role: 'system', content: '你是一个网址导航助手，只输出JSON。' },
+      { role: 'user', content: prompt }
+    ]);
     let results;
     try {
       results = JSON.parse(content);
@@ -554,6 +560,7 @@ app.post('/api/browser/search', async (req, res) => {
     res.status(500).json({ error: '无法解析，请稍后再试' });
   }
 });
+
 app.get('/api/browser/history', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -590,11 +597,10 @@ app.post('/api/translate', async (req, res) => {
 
   const prompt = `请将以下文本翻译成${targetLangName}。只返回翻译结果，不要添加任何额外说明。原文：${text}`;
   try {
-    const response = await client.ChatCompletions({
-      Model: 'hunyuan-lite',
-      Messages: [{ Role: 'user', Content: prompt }],
-    });
-    const translated = response.Choices[0].Message.Content.trim();
+    const translated = await callOpenAI([
+      { role: 'system', content: '你是一个翻译助手，只返回翻译结果。' },
+      { role: 'user', content: prompt }
+    ]);
 
     if (userId) {
       await pool.query(
@@ -609,6 +615,7 @@ app.post('/api/translate', async (req, res) => {
     res.status(500).json({ error: '翻译服务异常' });
   }
 });
+
 app.get('/api/translate/history', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -635,11 +642,11 @@ app.post('/api/memo', requireAuth, async (req, res) => {
   }
   内容：${content}`;
   try {
-    const response = await client.ChatCompletions({
-      Model: 'hunyuan-lite',
-      Messages: [{ Role: 'user', Content: prompt }],
-    });
-    const aiResult = JSON.parse(response.Choices[0].Message.Content);
+    const aiResponse = await callOpenAI([
+      { role: 'system', content: '你是一个备忘录分析助手，只返回JSON。' },
+      { role: 'user', content: prompt }
+    ]);
+    const aiResult = JSON.parse(aiResponse);
     const dueDate = aiResult.due_date ? new Date(aiResult.due_date) : null;
     const tags = aiResult.tags || [];
 
@@ -715,6 +722,7 @@ app.put('/api/memo/:id', requireAuth, async (req, res) => {
 // ---------- 环境变量检查 ----------
 if (!process.env.BASE_URL) console.warn('⚠️ 环境变量 BASE_URL 未设置，二维码生成可能失败。');
 if (!AMAP_KEY) console.warn('⚠️ 环境变量 AMAP_KEY 未设置，地图导航将无法使用。');
+if (!OPENAI_API_KEY) console.warn('⚠️ 环境变量 OPENAI_API_KEY 未设置，AI 功能将不可用。');
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
