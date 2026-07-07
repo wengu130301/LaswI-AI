@@ -72,7 +72,6 @@ const pool = new Pool({
     console.log('✅ 表 scan_codes 已就绪');
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_scan_codes_code ON scan_codes(code);`);
 
-    // 产品线配置表
     const productTables = ['digital_config', 'silent_config', 'pro_config', 'cyber_config'];
     for (const table of productTables) {
       await pool.query(`
@@ -88,7 +87,6 @@ const pool = new Pool({
       console.log(`✅ 表 ${table} 已就绪`);
     }
 
-    // 地图导航历史
     await pool.query(`
       CREATE TABLE IF NOT EXISTS navigation_history (
         id SERIAL PRIMARY KEY,
@@ -103,7 +101,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 navigation_history 已就绪');
 
-    // 浏览器搜索历史
     await pool.query(`
       CREATE TABLE IF NOT EXISTS browser_history (
         id SERIAL PRIMARY KEY,
@@ -115,7 +112,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 browser_history 已就绪');
 
-    // 翻译历史
     await pool.query(`
       CREATE TABLE IF NOT EXISTS translation_history (
         id SERIAL PRIMARY KEY,
@@ -128,7 +124,6 @@ const pool = new Pool({
     `);
     console.log('✅ 表 translation_history 已就绪');
 
-    // 备忘录
     await pool.query(`
       CREATE TABLE IF NOT EXISTS memos (
         id SERIAL PRIMARY KEY,
@@ -149,13 +144,14 @@ const pool = new Pool({
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.lkeap.cloud.tencent.com/v3';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'hy3-preview';
 
-// ---------- 辅助函数：统一调用 OpenAI ----------
+// ---------- 辅助函数：统一调用混元兼容接口 ----------
 async function callOpenAI(messages, model = OPENAI_MODEL) {
   try {
     const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
+      `${OPENAI_BASE_URL}/chat/completions`,
       {
         model: model,
         messages: messages,
@@ -170,8 +166,8 @@ async function callOpenAI(messages, model = OPENAI_MODEL) {
     );
     return response.data.choices[0].message.content;
   } catch (error) {
-    console.error('OpenAI API 错误:', error.response?.data || error.message);
-    throw new Error('OpenAI 调用失败');
+    console.error('混元 API 错误:', error.response?.data || error.message);
+    throw new Error('混元 API 调用失败');
   }
 }
 
@@ -278,7 +274,7 @@ app.post('/api/chat', async (req, res) => {
     }
     res.json({ reply });
   } catch (error) {
-    console.error('OpenAI API错误:', error);
+    console.error('聊天 API 错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
